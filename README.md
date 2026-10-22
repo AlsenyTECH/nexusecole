@@ -5,6 +5,16 @@ SaaS **hybride** de gestion scolaire pour le Sénégal :
 - une console super-admin pour gérer les écoles, les forfaits et les factures ;
 - la possibilité de passer une école sur une **instance dédiée** sans changer de code.
 
+## Aperçu
+
+| Console super-admin | Espace école (mobile) |
+|---|---|
+| ![Console](docs/captures/2-console-tableau-de-bord.png) | ![École mobile](docs/captures/4-ecole-verte-eleves-mobile.png) |
+
+| Même code, autre école (marque blanche) | École suspendue : lecture seule |
+|---|---|
+| ![École bleue](docs/captures/5-ecole-bleue-eleves.png) | ![Suspendue](docs/captures/6-ecole-suspendue-lecture-seule.png) |
+
 ## Architecture
 
 ```
