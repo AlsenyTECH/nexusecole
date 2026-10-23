@@ -1,4 +1,7 @@
-# Base PostgreSQL de développement : docker compose up -d
+# Environnement de développement complet : docker compose up
+#   Console : http://admin.localhost:5173
+#   École   : http://lycee-demo.localhost:5173
+# Le code est monté dans les conteneurs : vos modifications sont prises en compte à chaud.
 services:
   db:
     image: postgres:16
@@ -8,5 +11,31 @@ services:
       POSTGRES_DB: nexusecole
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexusecole"]
+      interval: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    command: sh -c "python manage.py demarrage_dev && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DATABASE_URL: postgres://nexus:nexus@db:5432/nexusecole
+      SUPERADMIN_EMAIL: admin@nexusecole.sn
+      SUPERADMIN_PASSWORD: Admin-Nexus-2026
+    volumes: ["./backend:/app"]
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_URL: http://backend:8000
+      VITE_POLLING: "1"
+    volumes: ["./frontend:/app", "/app/node_modules"]
+    ports: ["5173:5173"]
+    depends_on: [backend]
+
 volumes:
   pgdata:

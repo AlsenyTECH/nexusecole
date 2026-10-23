@@ -44,9 +44,31 @@ ecole-y.nexusecole.sn ─┘                        │   TenantMainMiddleware :
 | Respect des limites du forfait (élèves, modules) | `EleveSerializer.validate`, `ModuleActif` | `test_quota_eleves_du_forfait` |
 | Protection contre la force brute à la connexion | limite de 10 tentatives par minute | non testé |
 
-## Démarrage en local
+## Démarrage avec Docker (recommandé, Windows / Mac / Linux)
 
-Prérequis : Python 3.12+, Node 20+, PostgreSQL 16 (`docker compose up -d`).
+Prérequis : [Docker Desktop](https://www.docker.com/products/docker-desktop/) et Git.
+
+```bash
+git clone https://github.com/AlsenyTECH/nexusecole.git
+cd nexusecole
+docker compose up --build
+```
+
+Au premier lancement : base de données, plateforme, super-admin et école de démo sont créés automatiquement.
+
+| Adresse | Identifiants |
+|---|---|
+| http://admin.localhost:5173 (console) | `admin@nexusecole.sn` / `Admin-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (école) | `directeur@lycee-demo.sn` / `Demo-Nexus-2026` |
+
+Le code est monté dans les conteneurs : modifiez un fichier dans VS Code, l'application se recharge.
+
+- Lancer les tests : `docker compose exec backend python manage.py test`
+- Arrêter : `Ctrl + C` puis `docker compose down` (ajouter `-v` pour effacer la base)
+
+## Démarrage en local sans Docker
+
+Prérequis : Python 3.12+, Node 20+, PostgreSQL 16.
 
 ```bash
 # Backend
