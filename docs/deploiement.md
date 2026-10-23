@@ -83,7 +83,7 @@ cp deploy/env.production.example .env
 nano .env
 ```
 
-Dans `.env`, renseignez votre domaine et générez **chaque secret** avec `openssl rand -base64 48` :
+Dans `.env`, renseignez votre domaine et générez **chaque secret** avec `openssl rand -hex 32` (hexadécimal : les caractères `/ + =` casseraient l'adresse de connexion à la base) :
 
 | Variable | Valeur |
 |---|---|
