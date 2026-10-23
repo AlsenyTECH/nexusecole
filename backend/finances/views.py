@@ -196,7 +196,7 @@ class ImpayesView(APIView):
         for e in echues:
             insc = e.inscription
             ligne = par_eleve[insc.pk]
-            ligne.update(inscription=insc.pk, eleve=str(insc.eleve), classe=insc.classe.nom,
+            ligne.update(inscription=insc.pk, eleve_id=insc.eleve_id, eleve=str(insc.eleve), classe=insc.classe.nom,
                          telephone_parent=insc.eleve.telephone_parent)
             ligne["montant"] += e.reste
             ligne["echeances"] += 1

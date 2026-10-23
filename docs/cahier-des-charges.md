@@ -159,9 +159,9 @@ En phase 1, les paiements Wave / OM sont **enregistrés par la caisse** avec la 
 | Phase | Contenu | État |
 |---|---|---|
 | 0 | Socle multi-tenant, marque blanche, console, forfaits, factures | ✅ |
-| 1a | Droits configurables, inscriptions, frais, échéances, paiements, reçus, caisse | ✅ API |
+| 1a | Droits configurables, inscriptions, frais, échéances, paiements, reçus, caisse | ✅ |
 | 1b | Matières, cours, attributions, notes, bulletins PDF signés, absences | à faire |
-| 1c | Nouveau design (inspiré d'AP2A Impact) | à faire |
+| 1c | Nouveau design (inspiré d'AP2A Impact) | ✅ |
 | 2 | Espaces parent / élève, carte QR, porte-monnaie, paiement mobile | à faire |
 | 3 | Cantine, boutique, événements & billetterie | à faire |
 | 4 | Élections, NFC, écoles pilotes, mise en production | à faire |

@@ -1,10 +1,13 @@
+import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
-// En dev : ouvrir http://lycee-demo.localhost:5173 (école) ou http://admin.localhost:5173 (console).
+// En dev : http://lycee-demo.localhost:5173 (école) ou http://admin.localhost:5173 (console).
 // Le proxy conserve l'en-tête Host → Django sait quelle école est visée.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   server: {
     proxy: { "/api": { target: process.env.API_URL || "http://localhost:8000", changeOrigin: false } },
     // Sous Docker Desktop (Windows/Mac), les changements de fichiers ne sont vus que par scrutation

@@ -57,6 +57,11 @@ class FraisTests(BaseFinances):
         self.assertEqual(s["total"], 25_000 + 10 * 15_000)
         self.assertEqual(s["reste"], s["total"])
 
+    def test_echeances_dans_l_ordre_chronologique(self):
+        insc = self.inscrire()
+        dates = [e["date_limite"] for e in self.dir.get(f"/api/inscriptions/{insc}/situation").json()["echeances"]]
+        self.assertEqual(dates, sorted(dates))
+
     def test_reduction_sur_la_scolarite_uniquement(self):
         insc = self.inscrire(reduction_pct=50, motif_reduction="Fratrie")
         s = self.dir.get(f"/api/inscriptions/{insc}/situation").json()
@@ -187,3 +192,30 @@ class DroitsTests(BaseFinances):
         codes = {r["code"] for r in roles}
         self.assertTrue({"directeur", "comptable", "parent", "eleve"} <= codes)
         self.assertNotIn("superadmin", codes)
+
+
+class TableauDeBordTests(BaseFinances):
+    def test_chiffres_et_argent_selon_les_droits(self):
+        insc = self.inscrire()
+        self.payer(self.caisse, insc, 25_000)
+        d = self.dir.get("/api/tableau-de-bord").json()
+        self.assertEqual((d["annee"], d["eleves_inscrits"], d["filles"]), ("2026-2027", 1, 1))
+        self.assertEqual(d["finances"]["encaisse_jour"], 25_000)
+        self.assertEqual(d["finances"]["impayes"], 2 * 15_000)
+        prof = self.auth(HOTE_A, "prof@a.sn").get("/api/tableau-de-bord").json()
+        self.assertNotIn("finances", prof)  # l'enseignant ne voit pas l'argent
+
+    def test_recherche_d_inscription_pour_la_caisse(self):
+        self.inscrire()
+        self.inscrire(self.eleve2)
+        r = self.caisse.get("/api/inscriptions?q=fall").json()
+        self.assertEqual([i["eleve_nom"] for i in r["results"]], ["Modou Fall (A-101)"])
+
+
+class AnneeActiveTests(BaseFinances):
+    def test_une_seule_annee_active(self):
+        r = self.dir.post("/api/annees", {"libelle": "2027-2028", "debut": "2027-10-01", "fin": "2028-07-31", "active": True},
+                          format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        actives = [a["libelle"] for a in self.dir.get("/api/annees").json()["results"] if a["active"]]
+        self.assertEqual(actives, ["2027-2028"])

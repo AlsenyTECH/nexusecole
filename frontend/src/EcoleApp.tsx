@@ -1,119 +1,121 @@
-import { FormEvent, useEffect, useState } from "react";
-import { api, deconnexion, ErreurApi, estConnecte, post } from "./api";
-import Connexion from "./Connexion";
+import { useEffect } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, Banknote, BookOpen, GraduationCap, Home, Layers, ReceiptText, ShieldCheck, UsersRound } from "lucide-react";
+import { Connexion } from "@/components/Connexion";
+import { Layout, type Groupe } from "@/components/Layout";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { appliquerCouleurs } from "@/lib/couleurs";
+import { ROLES } from "@/lib/format";
+import type { Config } from "@/lib/types";
+import { Accueil } from "@/pages/Accueil";
+import { Caisse } from "@/pages/Caisse";
+import { Classes } from "@/pages/Classes";
+import { EleveDetail } from "@/pages/EleveDetail";
+import { Eleves } from "@/pages/Eleves";
+import { GrilleFrais } from "@/pages/GrilleFrais";
+import { Impayes } from "@/pages/Impayes";
+import { Personnel } from "@/pages/Personnel";
+import { Recu } from "@/pages/Recu";
+import { Roles } from "@/pages/Roles";
 
-type Config = {
-  nom: string;
-  logo_url: string;
-  couleur_primaire: string;
-  couleur_secondaire: string;
-  modules: string[];
-  statut: string;
-  lecture_seule: boolean;
-};
-type Eleve = { id: number; matricule: string; prenom: string; nom: string; sexe: "F" | "M"; classe: number | null };
-type Page<T> = { count: number; results: T[] };
-type Moi = { prenom: string; nom: string; role: string };
-
-export default function EcoleApp() {
-  const [config, setConfig] = useState<Config | null>(null);
-  const [introuvable, setIntrouvable] = useState(false);
-  const [connecte, setConnecte] = useState(estConnecte());
-
-  useEffect(() => {
-    api<Config>("/api/ecole/config")
-      .then((c) => {
-        setConfig(c);
-        document.title = c.nom;
-        // Marque blanche : les couleurs de l'école deviennent les couleurs de l'interface
-        document.documentElement.style.setProperty("--primaire", c.couleur_primaire);
-        document.documentElement.style.setProperty("--secondaire", c.couleur_secondaire);
-      })
-      .catch(() => setIntrouvable(true));
-  }, []);
-
-  if (introuvable) return <main className="centre"><p>Établissement introuvable.</p></main>;
-  if (!config) return <main className="centre"><p>Chargement…</p></main>;
-  if (!connecte) return <Connexion titre={config.nom} logo={config.logo_url} onOk={() => setConnecte(true)} />;
-  return <TableauDeBord config={config} onQuitter={() => { deconnexion(); setConnecte(false); }} />;
-}
-
-function TableauDeBord({ config, onQuitter }: { config: Config; onQuitter: () => void }) {
-  const [moi, setMoi] = useState<Moi | null>(null);
-  const [eleves, setEleves] = useState<Page<Eleve> | null>(null);
-  const [erreur, setErreur] = useState("");
-
-  const charger = () =>
-    api<Page<Eleve>>("/api/eleves").then(setEleves).catch((e) => setErreur(e instanceof ErreurApi ? e.message : String(e)));
+export function EcoleApp() {
+  const { moi, chargement, deconnecter, peut } = useAuth();
+  const { data: config, isError } = useQuery({
+    queryKey: ["config"],
+    queryFn: () => api<Config>("/api/ecole/config"),
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
-    api<Moi>("/api/moi").then(setMoi).catch(onQuitter);
-    charger();
-  }, []);
+    if (!config) return;
+    appliquerCouleurs(config.couleur_primaire, config.couleur_secondaire);
+    document.title = config.nom;
+  }, [config]);
 
-  return (
-    <>
-      <header className="barre">
-        <div className="marque">
-          {config.logo_url && <img src={config.logo_url} alt="" />}
-          <strong>{config.nom}</strong>
-        </div>
-        <div>
-          {moi && <span className="discret">{moi.prenom} {moi.nom} · {moi.role}</span>}
-          <button className="lien" onClick={onQuitter}>Déconnexion</button>
-        </div>
-      </header>
-      <main className="contenu">
-        {config.lecture_seule && (
-          <p className="alerte">Abonnement suspendu : vos données restent consultables, mais les modifications sont bloquées jusqu'au règlement.</p>
-        )}
-        {erreur && <p className="erreur">{erreur}</p>}
-        <section className="carte">
-          <h2>Élèves {eleves && <span className="discret">({eleves.count})</span>}</h2>
-          {!config.lecture_seule && <NouvelEleve onAjout={charger} />}
-          <table>
-            <thead><tr><th>Matricule</th><th>Prénom</th><th>Nom</th><th>Sexe</th></tr></thead>
-            <tbody>
-              {eleves?.results.map((e) => (
-                <tr key={e.id}><td>{e.matricule}</td><td>{e.prenom}</td><td>{e.nom}</td><td>{e.sexe}</td></tr>
-              ))}
-              {eleves?.count === 0 && <tr><td colSpan={4} className="discret">Aucun élève inscrit pour l'instant.</td></tr>}
-            </tbody>
-          </table>
-        </section>
-      </main>
-    </>
-  );
-}
+  if (isError) return <div className="grid min-h-dvh place-items-center p-6 text-center text-muted-foreground">Établissement introuvable.</div>;
+  if (!config || chargement) return <div className="grid min-h-dvh place-items-center text-muted-foreground">Chargement…</div>;
 
-function NouvelEleve({ onAjout }: { onAjout: () => void }) {
-  const vide = { matricule: "", prenom: "", nom: "", sexe: "F" };
-  const [f, setF] = useState(vide);
-  const [erreur, setErreur] = useState("");
-
-  async function soumettre(e: FormEvent) {
-    e.preventDefault();
-    setErreur("");
-    try {
-      await post("/api/eleves", f);
-      setF(vide);
-      onAjout();
-    } catch (err) {
-      setErreur(err instanceof ErreurApi ? JSON.stringify(err.donnees) : String(err));
-    }
+  if (!moi) {
+    return (
+      <Connexion
+        nom={config.nom}
+        logo={config.logo_url || undefined}
+        accroche="Toute la vie de l'école, au même endroit."
+        points={[
+          ["Inscrire", "les élèves et suivre leurs frais de scolarité"],
+          ["Encaisser", "en espèces, Wave ou Orange Money, avec un reçu à chaque paiement"],
+          ["Suivre", "les impayés, la caisse du jour et bientôt les notes et bulletins"],
+        ]}
+        pied={`${config.nom}${config.ville ? ` — ${config.ville}` : ""} · avec NexusEcole`}
+      />
+    );
   }
 
+  const frais = config.modules.includes("frais");
+  const groupes: Groupe[] = [
+    {
+      titre: "Pilotage",
+      liens: [
+        { vers: "/", libelle: "Accueil", icone: Home },
+        { vers: "/caisse", libelle: "Caisse", icone: Banknote, visible: frais && peut("frais.encaisser") },
+        { vers: "/impayes", libelle: "Impayés", icone: AlertTriangle, visible: frais && peut("frais.rapports") },
+      ],
+    },
+    {
+      titre: "Scolarité",
+      liens: [
+        { vers: "/eleves", libelle: "Élèves", icone: GraduationCap, visible: peut("eleves.voir") },
+        { vers: "/classes", libelle: "Classes et années", icone: Layers, visible: peut("eleves.voir") },
+      ],
+    },
+    {
+      titre: "Finances",
+      liens: [{ vers: "/frais", libelle: "Grille des frais", icone: ReceiptText, visible: frais && peut("frais.voir") }],
+    },
+    {
+      titre: "Réglages",
+      liens: [
+        { vers: "/personnel", libelle: "Personnel", icone: UsersRound, visible: peut("utilisateurs.gerer") },
+        { vers: "/roles", libelle: "Rôles et droits", icone: ShieldCheck, visible: peut("roles.gerer") },
+      ],
+    },
+  ];
+
+  const lectureSeule = config.lecture_seule ? (
+    <div className="no-print border-b border-or/40 bg-or-soft px-4 py-2.5 text-center text-sm text-[#5c4100]">
+      <BookOpen className="mr-1.5 inline size-4 align-[-3px]" />
+      Abonnement suspendu : vos données restent consultables, mais les modifications sont bloquées jusqu'au règlement.
+    </div>
+  ) : undefined;
+
   return (
-    <form className="ligne" onSubmit={soumettre}>
-      <input placeholder="Matricule" value={f.matricule} onChange={(e) => setF({ ...f, matricule: e.target.value })} required />
-      <input placeholder="Prénom" value={f.prenom} onChange={(e) => setF({ ...f, prenom: e.target.value })} required />
-      <input placeholder="Nom" value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} required />
-      <select value={f.sexe} onChange={(e) => setF({ ...f, sexe: e.target.value })}>
-        <option value="F">Fille</option>
-        <option value="M">Garçon</option>
-      </select>
-      <button>Inscrire</button>
-      {erreur && <p className="erreur">{erreur}</p>}
-    </form>
+    <Routes>
+      <Route path="/recus/:id" element={<Recu />} />
+      <Route
+        element={
+          <Layout
+            groupes={groupes}
+            bas={["/", "/eleves", "/caisse", "/impayes"]}
+            marque={{ nom: config.nom, sousTitre: config.ville || "Espace établissement", logo: config.logo_url || undefined }}
+            utilisateur={{ prenom: moi.prenom, nom: moi.nom || moi.email, detail: ROLES[moi.role] ?? moi.role }}
+            deconnecter={deconnecter}
+            bandeau={lectureSeule}
+          />
+        }
+      >
+        <Route index element={<Accueil config={config} />} />
+        <Route path="caisse" element={<Caisse />} />
+        <Route path="impayes" element={<Impayes />} />
+        <Route path="eleves" element={<Eleves />} />
+        <Route path="eleves/:id" element={<EleveDetail />} />
+        <Route path="classes" element={<Classes />} />
+        <Route path="frais" element={<GrilleFrais />} />
+        <Route path="personnel" element={<Personnel />} />
+        <Route path="roles" element={<Roles />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }

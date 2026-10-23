@@ -7,13 +7,24 @@ SaaS **hybride** de gestion scolaire pour le Sénégal :
 
 ## Aperçu
 
-| Console super-admin | Espace école (mobile) |
-|---|---|
-| ![Console](docs/captures/2-console-tableau-de-bord.png) | ![École mobile](docs/captures/4-ecole-verte-eleves-mobile.png) |
+Design inspiré d'AP2A Impact (Plus Jakarta Sans / Outfit, barre latérale, bandeaux en dégradé, mode sombre),
+aux couleurs de chaque école.
 
-| Même code, autre école (marque blanche) | École suspendue : lecture seule |
+| Accueil de l'école | Fiche élève : échéances et paiements |
 |---|---|
-| ![École bleue](docs/captures/5-ecole-bleue-eleves.png) | ![Suspendue](docs/captures/6-ecole-suspendue-lecture-seule.png) |
+| ![Accueil](docs/captures/02-accueil.png) | ![Fiche élève](docs/captures/04-fiche-eleve.png) |
+
+| Encaissement (Wave, OM, espèces…) | Reçu imprimable |
+|---|---|
+| ![Encaissement](docs/captures/05-encaissement.png) | ![Reçu](docs/captures/07-recu.png) |
+
+| Impayés avec relance WhatsApp | Rôles et droits configurables |
+|---|---|
+| ![Impayés](docs/captures/09-impayes.png) | ![Rôles](docs/captures/13-roles.png) |
+
+| Autre école, autres couleurs | Mode sombre | Téléphone |
+|---|---|---|
+| ![École bleue](docs/captures/22-ecole-bleue-accueil.png) | ![Sombre](docs/captures/14-accueil-sombre.png) | ![Mobile](docs/captures/17-mobile-accueil.png) |
 
 ## Architecture
 
@@ -31,7 +42,7 @@ ecole-y.nexusecole.sn ─┘                        │   TenantMainMiddleware :
 | un par école | utilisateurs de l'école, années, classes, élèves (puis notes, frais, absences…) |
 
 - **Backend** : Django 5.1, django-tenants (un schéma PostgreSQL par école), DRF, SimpleJWT
-- **Frontend** : React 18 + Vite + TypeScript, un seul build ; le sous-domaine `admin.` affiche la console
+- **Frontend** : React 19, Vite, TypeScript, Tailwind CSS 4, Radix UI, TanStack Query ; un seul build, le sous-domaine `admin.` affiche la console
 
 ### Sécurité multi-tenant
 
@@ -59,7 +70,11 @@ Au premier lancement : base de données, plateforme, super-admin et école de d�
 | Adresse | Identifiants |
 |---|---|
 | http://admin.localhost:5173 (console) | `admin@nexusecole.sn` / `Admin-Nexus-2026` |
-| http://lycee-demo.localhost:5173 (école) | `directeur@lycee-demo.sn` / `Demo-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (école, directeur) | `directeur@lycee-demo.sn` / `Demo-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (école, caissier) | `caisse@lycee-demo.sn` / `Demo-Nexus-2026` |
+
+L'école de démo est remplie automatiquement : année scolaire, 5 classes, grille des frais,
+16 élèves inscrits et quelques paiements.
 
 Le code est monté dans les conteneurs : modifiez un fichier dans VS Code, l'application se recharge.
 
@@ -141,7 +156,7 @@ Paiement annuel (10 mois) : 2 mois offerts.
 - [x] **Phase 0 – Socle** : multi-tenant, marque blanche, console, forfaits, factures, tests d'isolation
 - [x] **Phase 1a** : droits configurables, inscriptions, frais, échéances, paiements, reçus, impayés, caisse (API)
 - [ ] **Phase 1b** : matières, cours, attributions, notes, bulletins PDF signés (QR code), absences
-- [ ] **Phase 1c** : nouveau design inspiré d'AP2A Impact
+- [x] **Phase 1c** : nouveau design inspiré d'AP2A Impact (écrans école et console)
 - [ ] **Phase 2 – Parents** : PWA parents, SMS/WhatsApp, paiement Wave / Orange Money
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants

@@ -1,0 +1,194 @@
+@import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/outfit";
+
+/* =====================================================================
+   NexusEcole — identité visuelle (inspirée d'AP2A Impact).
+   Les couleurs « marque » (primary, sidebar, dégradés, accent) sont
+   recalculées à partir des couleurs de chaque école : voir lib/couleurs.ts.
+   Les composants ne codent jamais une teinte : tout passe par ces variables.
+   ===================================================================== */
+:root {
+  --radius: 0.875rem;
+
+  --background: #f4f5f3;
+  --foreground: #14201c;
+  --card: #ffffff;
+  --card-foreground: #14201c;
+  --popover: #ffffff;
+  --popover-foreground: #14201c;
+
+  --primary: #0f766e;
+  --primary-hover: #0d645e;
+  --primary-foreground: #ffffff;
+  --primary-soft: #e2f1ef;
+
+  --secondary: #eef1ef;
+  --secondary-foreground: #1d2d28;
+  --muted: #eef1ef;
+  --muted-foreground: #5d6b66;
+  --accent: #e2f1ef;
+  --accent-foreground: #0a4f49;
+
+  --or: #e9a812;
+  --or-soft: #fdf3d8;
+
+  --destructive: #d03b3b;
+  --destructive-foreground: #ffffff;
+  --success: #0ca30c;
+  --success-foreground: #ffffff;
+  --warning: #e9a812;
+  --warning-foreground: #3d2c00;
+
+  --border: #e2e6e3;
+  --input: #dce1de;
+  --ring: #0f766e;
+
+  --sidebar: #0b2a25;
+  --sidebar-foreground: #e6efec;
+  --sidebar-muted: #8fa8a1;
+  --sidebar-active: #14433b;
+  --sidebar-border: #1b3d36;
+
+  --marque: #f59e0b;
+  --marque-clair: #f8bb4d;
+  --degrade-1: #0f766e;
+  --degrade-2: #0b5c55;
+  --degrade-3: #0b2a25;
+  --voile: rgb(11 42 37 / 0.4);
+
+  --ombre-carte: 0 1px 2px rgb(20 32 28 / 0.04), 0 1px 3px rgb(20 32 28 / 0.06);
+  --ombre-haute: 0 10px 30px -12px rgb(20 32 28 / 0.25);
+}
+
+/* Mode sombre (au choix, ou selon le réglage du téléphone). */
+:root[data-mode="sombre"] {
+  color-scheme: dark;
+  --background: #0e1513;
+  --foreground: #e6efec;
+  --card: #151f1c;
+  --card-foreground: #e6efec;
+  --popover: #18231f;
+  --popover-foreground: #e6efec;
+  --secondary: #1d2a26;
+  --secondary-foreground: #dce8e4;
+  --muted: #1d2a26;
+  --muted-foreground: #9fb2ab;
+  --or-soft: #3a2f12;
+  --border: #26342f;
+  --input: #2f3f39;
+  --voile: rgb(0 0 0 / 0.6);
+  --ombre-carte: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.35);
+  --ombre-haute: 0 10px 30px -12px rgb(0 0 0 / 0.7);
+}
+/* Documents à imprimer (reçus) : toujours clairs. */
+:root[data-mode="sombre"] .clair {
+  color-scheme: light;
+  --background: #f4f5f3; --foreground: #14201c; --card: #ffffff; --card-foreground: #14201c;
+  --muted: #eef1ef; --muted-foreground: #5d6b66; --border: #e2e6e3;
+}
+/* Pastilles aux couleurs fixes : versions sombres. */
+:root[data-mode="sombre"] :where(:not(.clair, .clair *)) {
+  &.bg-\[\#fbe6e6\] { background-color: rgb(208 59 59 / 0.18); }
+  &.text-\[\#a32b2b\] { color: #f3a5a5; }
+  &.bg-\[\#e2f4e2\] { background-color: rgb(12 163 12 / 0.18); }
+  &.text-\[\#0b6b0b\] { color: #8fe38f; }
+  &.bg-\[\#fdf3d8\], &.bg-or-soft { background-color: rgb(233 168 18 / 0.16); }
+  &.text-\[\#7a5600\], &.text-\[\#5c4100\] { color: #f2c14e; }
+  &.bg-\[\#e6eefb\] { background-color: rgb(31 78 153 / 0.25); }
+  &.text-\[\#1f4e99\] { color: #a9c5f2; }
+  &.bg-\[\#fbe8ef\] { background-color: rgb(155 44 85 / 0.25); }
+  &.text-\[\#9b2c55\] { color: #f2a9c4; }
+  &.bg-\[\#ece8fb\] { background-color: rgb(79 58 163 / 0.22); }
+  &.text-\[\#4f3aa3\] { color: #c3b5f7; }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-or: var(--or);
+  --color-or-soft: var(--or-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-marque: var(--marque);
+  --color-marque-clair: var(--marque-clair);
+  --color-degrade-1: var(--degrade-1);
+  --color-degrade-2: var(--degrade-2);
+  --color-degrade-3: var(--degrade-3);
+  --color-voile: var(--voile);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-carte: var(--ombre-carte);
+  --shadow-haute: var(--ombre-haute);
+
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --animate-apparition: apparition 0.25s ease-out both;
+  @keyframes apparition {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { @apply font-heading text-foreground; letter-spacing: -0.015em; }
+  ::selection { background: var(--primary-soft); color: var(--accent-foreground); }
+  .chiffres { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer utilities {
+  .defilement-fin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .defilement-fin::-webkit-scrollbar-track { background: transparent; }
+  .defilement-fin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+}
+
+/* Impression des reçus : uniquement le document. */
+@page { size: A5; margin: 10mm; }
+@media print {
+  aside, header, nav, .no-print { display: none !important; }
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .document { box-shadow: none !important; border: 0 !important; margin: 0 !important; max-width: none !important; }
+}

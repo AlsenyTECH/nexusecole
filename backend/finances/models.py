@@ -52,7 +52,9 @@ class Frais(models.Model):
 class EcheanceQuerySet(models.QuerySet):
     def avec_soldes(self):
         paye = Coalesce(Sum("imputations__montant", filter=Q(imputations__paiement__annule=False)), 0)
-        return self.annotate(paye=paye).annotate(reste=models.F("montant") - models.F("paye"))
+        # order_by explicite : Django ignore Meta.ordering dans les requêtes avec agrégation
+        return (self.annotate(paye=paye).annotate(reste=models.F("montant") - models.F("paye"))
+                .order_by("date_limite", "id"))
 
 
 class Echeance(models.Model):

@@ -6,6 +6,7 @@ import os
 
 from django.core.management import BaseCommand, call_command
 
+from clients import demo
 from clients.models import Ecole, Forfait
 from clients.services import creer_ecole
 
@@ -26,7 +27,10 @@ class Command(BaseCommand):
                 directeur={"email": "directeur@lycee-demo.sn", "mot_de_passe": "Demo-Nexus-2026",
                            "prenom": "Awa", "nom": "Diop"},
             )
+        if demo.remplir(Ecole.objects.get(schema_name="lycee_demo")):
+            self.stdout.write("  Données de démonstration ajoutées (élèves, frais, paiements).")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
-            "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)\n"
+            "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
+            "\n  Caisse  : caisse@lycee-demo.sn / Demo-Nexus-2026\n"
         ))
