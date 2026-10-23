@@ -31,3 +31,22 @@ export function lienWhatsApp(telephone: string, message: string) {
   if (n.length === 9) n = `221${n}`;
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(message)}` : null;
 }
+
+export function usePeriodes(annee?: number | null) {
+  return useQuery({
+    queryKey: ["periodes", annee],
+    enabled: !!annee,
+    queryFn: async () => (await api<Page<import("./types").Periode>>(`/api/periodes?annee=${annee}`)).results,
+  });
+}
+
+/** Période en cours (celle qui contient aujourd'hui), sinon la première. */
+export function periodeCourante(periodes: import("./types").Periode[] | undefined) {
+  const jour = new Date().toLocaleDateString("sv-SE");
+  return periodes?.find((p) => p.debut <= jour && jour <= p.fin) ?? periodes?.[0] ?? null;
+}
+
+/** « 1er », « 2e »… */
+export const rang = (r: number | null | undefined) => (r == null ? "—" : r === 1 ? "1er" : `${r}e`);
+
+export const note = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("fr-FR", { maximumFractionDigits: 2 }));

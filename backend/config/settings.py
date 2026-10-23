@@ -56,6 +56,7 @@ TENANT_APPS = [
     "comptes",
     "scolarite",
     "finances",
+    "pedagogie",
 ]
 
 INSTALLED_APPS = SHARED_APPS + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -103,8 +104,14 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"connexion": os.environ.get("THROTTLE_CONNEXION", "10/min")},
+    "DEFAULT_THROTTLE_RATES": {
+        "connexion": os.environ.get("THROTTLE_CONNEXION", "10/min"),
+        "verification": "30/min",
+    },
 }
+
+# Secret dont dérivent les clés Ed25519 de signature des bulletins (une par école)
+BULLETIN_SIGNING_SECRET = os.environ.get("BULLETIN_SIGNING_SECRET", SECRET_KEY)
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),

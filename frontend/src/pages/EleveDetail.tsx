@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ouvrirDocument } from "@/lib/utils";
 import { api, messageErreur, post, type Page } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { date, dateHeure, fcfa, MOYENS } from "@/lib/format";
@@ -152,7 +153,7 @@ function Finances({ inscription }: { inscription: number }) {
                 </div>
                 {p.annule ? <Pastille ton="rouge">Annulé</Pastille> : null}
                 <span className={p.annule ? "font-semibold text-muted-foreground line-through chiffres" : "font-semibold chiffres"}>{fcfa(p.montant)}</span>
-                <Button asChild variant="ghost" size="sm"><a href={`/recus/${p.id}`} target="_blank" rel="noreferrer">Reçu</a></Button>
+                <Button variant="ghost" size="sm" onClick={() => ouvrirDocument(`/recus/${p.id}`)}>Reçu</Button>
                 {!p.annule && peut("frais.annuler") ? <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setAAnnuler(p)}>Annuler</Button> : null}
               </div>
             ))}

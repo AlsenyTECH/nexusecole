@@ -19,6 +19,8 @@ class Classe(models.Model):
     annee = models.ForeignKey(AnneeScolaire, on_delete=models.PROTECT, related_name="classes")
     nom = models.CharField(max_length=40, help_text="ex. 6e A, Terminale S2")
     niveau = models.CharField(max_length=30, blank=True)
+    bareme = models.PositiveSmallIntegerField(default=20, choices=[(10, "Sur 10"), (20, "Sur 20")],
+                                              help_text="Barème des notes : /10 à l'élémentaire, /20 ensuite")
 
     class Meta:
         ordering = ["niveau", "nom"]

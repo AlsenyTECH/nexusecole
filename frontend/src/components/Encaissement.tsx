@@ -11,7 +11,7 @@ import { api, messageErreur, post } from "@/lib/api";
 import { date, fcfa, MOYENS } from "@/lib/format";
 import { useRafraichir } from "@/lib/requetes";
 import type { Paiement, Situation } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, ouvrirDocument } from "@/lib/utils";
 
 /** Encaisser un paiement pour une inscription ; propose ensuite d'imprimer le reçu. */
 export function Encaissement({ inscription, ouvert, fermer }: { inscription: number | null; ouvert: boolean; fermer: () => void }) {
@@ -79,7 +79,7 @@ export function Encaissement({ inscription, ouvert, fermer }: { inscription: num
             </div>
             <DialogFooter>
               <Button variant="secondary" onClick={fermer}>Terminer</Button>
-              <Button onClick={() => window.open(`/recus/${recu.id}`, "_blank")}><Printer /> Imprimer le reçu</Button>
+              <Button onClick={() => ouvrirDocument(`/recus/${recu.id}`)}><Printer /> Imprimer le reçu</Button>
             </DialogFooter>
           </div>
         ) : (

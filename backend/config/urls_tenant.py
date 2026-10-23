@@ -4,6 +4,9 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from comptes.views import ConnexionView, MoiView, PersonnelViewSet, RafraichissementView, RoleDetailView, RolesView
+from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, ConseilView, CoursViewSet,
+                             EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
+                             ResultatsView, SurveillanceViewSet, VerificationView)
 from finances.views import CaisseView, FraisViewSet, ImpayesView, PaiementViewSet, SituationView
 from scolarite.views import (AnneeScolaireViewSet, ClasseViewSet, ConfigEcoleView, EleveViewSet, InscriptionViewSet,
                               TableauDeBordView)
@@ -16,6 +19,13 @@ router.register("inscriptions", InscriptionViewSet)
 router.register("personnel", PersonnelViewSet)
 router.register("frais", FraisViewSet)
 router.register("paiements", PaiementViewSet)
+router.register("periodes", PeriodeViewSet)
+router.register("matieres", MatiereViewSet)
+router.register("cours", CoursViewSet)
+router.register("surveillances", SurveillanceViewSet)
+router.register("evaluations", EvaluationViewSet)
+router.register("absences", AbsenceViewSet)
+router.register("bulletins", BulletinViewSet)
 
 urlpatterns = [
     path("api/sante", lambda r: JsonResponse({"ok": True})),
@@ -29,5 +39,11 @@ urlpatterns = [
     path("api/inscriptions/<int:pk>/situation", SituationView.as_view()),
     path("api/finances/impayes", ImpayesView.as_view()),
     path("api/finances/caisse", CaisseView.as_view()),
+    path("api/pedagogie/parametres", ParametresView.as_view()),
+    path("api/pedagogie/journal", JournalView.as_view()),
+    path("api/appel", AppelView.as_view()),
+    path("api/resultats", ResultatsView.as_view()),
+    path("api/conseils", ConseilView.as_view()),
+    path("api/verifier/<str:code>", VerificationView.as_view()),
     path("api/", include(router.urls)),
 ]

@@ -192,3 +192,7 @@
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .document { box-shadow: none !important; border: 0 !important; margin: 0 !important; max-width: none !important; }
 }
+
+/* Bulletins : format A4 (les reçus restent en A5). */
+@page bulletin { size: A4; margin: 12mm; }
+.bulletin-racine { page: bulletin; }

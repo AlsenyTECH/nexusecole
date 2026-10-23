@@ -1,5 +1,5 @@
 """Données de démonstration réalistes pour l'école de démo (développement uniquement)."""
-from datetime import date
+from datetime import date, timedelta
 
 from django.utils import timezone
 from django_tenants.utils import schema_context
@@ -54,4 +54,68 @@ def remplir(ecole):
             if paye:
                 moyen = ["especes", "wave", "orange_money"][i % 3]
                 encaisser(insc, montant=paye, moyen=moyen, reference="" if moyen == "especes" else f"TX{i:05d}", encaisse_par=caissier)
+        return True
+
+
+MATIERES_COLLEGE = [("Mathématiques", 4), ("Français", 4), ("Anglais", 2), ("Sciences de la vie et de la Terre", 2),
+                    ("Histoire-Géographie", 2), ("Éducation physique", 1)]
+MATIERES_CM2 = [("Calcul", 3), ("Français", 3), ("Éveil scientifique", 2)]
+ENSEIGNANTS = [("prof@lycee-demo.sn", "Rokhaya", "Ndiaye"), ("prof.francais@lycee-demo.sn", "Alioune", "Badiane"),
+               ("prof.anglais@lycee-demo.sn", "Fatou", "Camara")]
+
+
+def remplir_pedagogie(ecole):
+    """Matières, cours, enseignants, surveillant, trimestres, notes et absences de démo (idempotent)."""
+    import random
+
+    from pedagogie import services
+    from pedagogie.models import Cours, Evaluation, Matiere, Periode, Surveillance
+
+    with schema_context(ecole.schema_name):
+        annee = AnneeScolaire.objects.filter(active=True).first()
+        if not annee or Matiere.objects.exists():
+            return False
+        profs = []
+        for email, prenom, nom in ENSEIGNANTS:
+            u = Utilisateur.objects.filter(email=email).first() or Utilisateur.objects.create_user(
+                email, "Demo-Nexus-2026", prenom=prenom, nom=nom, role=Role.ENSEIGNANT)
+            profs.append(u)
+        surv = Utilisateur.objects.filter(email="surveillant@lycee-demo.sn").first() or Utilisateur.objects.create_user(
+            "surveillant@lycee-demo.sn", "Demo-Nexus-2026", prenom="Lamine", nom="Sène", role=Role.SURVEILLANT)
+
+        for classe in Classe.objects.filter(annee=annee):
+            primaire = classe.niveau in ("CI", "CP", "CE1", "CE2", "CM1", "CM2")
+            if primaire and classe.bareme != 10:
+                classe.bareme = 10
+                classe.save(update_fields=["bareme"])
+            for k, (nom, coef) in enumerate(MATIERES_CM2 if primaire else MATIERES_COLLEGE):
+                Cours.objects.create(classe=classe, matiere=Matiere.objects.get_or_create(nom=nom)[0], coefficient=coef,
+                                     enseignant=profs[0] if k == 0 else profs[1] if "Français" in nom else profs[2] if k == 2 else None)
+            if classe.niveau in ("6e", "5e"):
+                Surveillance.objects.create(classe=classe, surveillant=surv)
+
+        n = 3
+        duree = (annee.fin - annee.debut).days + 1
+        for i in range(n):
+            debut = annee.debut + timedelta(days=duree * i // n)
+            fin = annee.fin if i == n - 1 else annee.debut + timedelta(days=duree * (i + 1) // n - 1)
+            Periode.objects.create(annee=annee, ordre=i + 1, debut=debut, fin=fin, nom=f"{'1er' if i == 0 else f'{i + 1}e'} trimestre")
+        t1 = Periode.objects.get(annee=annee, ordre=1)
+
+        # Notes du 1er trimestre pour la 6e A (tirage reproductible)
+        hasard = random.Random(2026)
+        directeur = Utilisateur.objects.filter(role=Role.DIRECTEUR).first()
+        jour = min(timezone.localdate(), t1.fin)
+        for cours in Cours.objects.filter(classe__nom="6e A").select_related("classe"):
+            for titre, type_ in (("Devoir n°1", "devoir"), ("Devoir n°2", "devoir")):
+                ev = Evaluation.objects.create(cours=cours, periode=t1, type=type_, titre=titre, date=jour, sur=20,
+                                               creee_par=cours.enseignant or directeur)
+                saisies = [{"inscription": i.pk, "valeur": round(min(20, max(3, hasard.gauss(12, 3.5))) * 4) / 4}
+                           for i in Inscription.objects.filter(classe=cours.classe)]
+                services.enregistrer_notes(ev, saisies, directeur)
+
+        from pedagogie.models import Absence
+        for k, insc in enumerate(Inscription.objects.filter(classe__nom__in=["6e A", "5e A"])[:4]):
+            Absence.objects.create(inscription=insc, date=jour, creneau="matin", type="absence" if k % 2 == 0 else "retard",
+                                   saisie_par=surv)
         return True

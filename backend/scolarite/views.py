@@ -41,7 +41,7 @@ class ClasseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Classe
-        fields = ["id", "annee", "nom", "niveau", "effectif"]
+        fields = ["id", "annee", "nom", "niveau", "bareme", "effectif"]
 
 
 class EleveSerializer(serializers.ModelSerializer):

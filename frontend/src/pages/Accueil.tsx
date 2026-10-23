@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Banknote, CalendarRange, GraduationCap, Layers, Plus, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Banknote, CalendarRange, ClipboardList, GraduationCap, Layers, Plus, UserCheck, Wallet } from "lucide-react";
 import { Bandeau, Indicateur, Liste, Pastille, Section } from "@/components/design";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ouvrirDocument } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateHeure, fcfa } from "@/lib/format";
@@ -40,6 +41,12 @@ export function Accueil({ config }: { config: Config }) {
         {peut("frais.encaisser") && config.modules.includes("frais") ? (
           <Button asChild size="sm" className="bg-white text-degrade-2 hover:bg-white/90"><Link to="/caisse"><Banknote /> Encaisser</Link></Button>
         ) : null}
+        {peut("notes.saisir") && config.modules.includes("notes") ? (
+          <Button asChild size="sm" className="border border-white/25 bg-white/10 text-white hover:bg-white/20"><Link to="/notes"><ClipboardList /> Saisir des notes</Link></Button>
+        ) : null}
+        {peut("absences.saisir") && config.modules.includes("absences") ? (
+          <Button asChild size="sm" className="border border-white/25 bg-white/10 text-white hover:bg-white/20"><Link to="/appel"><UserCheck /> Faire l'appel</Link></Button>
+        ) : null}
         {peut("eleves.gerer") ? (
           <Button asChild size="sm" className="border border-white/25 bg-white/10 text-white hover:bg-white/20"><Link to="/eleves?nouveau=1"><Plus /> Nouvel élève</Link></Button>
         ) : null}
@@ -73,7 +80,7 @@ export function Accueil({ config }: { config: Config }) {
           {f.derniers_paiements.length ? (
             <Liste>
               {f.derniers_paiements.map((p) => (
-                <a key={p.id} href={`/recus/${p.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
+                <button key={p.id} onClick={() => ouvrirDocument(`/recus/${p.id}`)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50">
                   <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-accent-foreground"><Banknote className="size-5" /></span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{p.eleve}</div>
@@ -81,7 +88,7 @@ export function Accueil({ config }: { config: Config }) {
                   </div>
                   <Pastille ton="gris" className="hidden sm:inline-flex">{p.moyen}</Pastille>
                   <span className="font-semibold chiffres">{fcfa(p.montant)}</span>
-                </a>
+                </button>
               ))}
             </Liste>
           ) : (

@@ -31,7 +31,8 @@ export function Layout({ groupes, bas, marque, utilisateur, deconnecter, bandeau
     .map((g) => ({ ...g, liens: g.liens.filter((l) => l.visible !== false) }))
     .filter((g) => g.liens.length);
   const tous = visibles.flatMap((g) => g.liens);
-  const basLiens = bas.map((v) => tous.find((l) => l.vers === v)).filter(Boolean) as Lien[];
+  // Les 4 premiers écrans visibles pour ce rôle (barre du bas sur téléphone)
+  const basLiens = (bas.map((v) => tous.find((l) => l.vers === v)).filter(Boolean) as Lien[]).slice(0, 4);
 
   const Logo = ({ petit }: { petit?: boolean }) =>
     marque.logo ? (

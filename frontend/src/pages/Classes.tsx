@@ -130,7 +130,8 @@ function NouvelleClasse({ annee, ouvert, fermer }: { annee: number; ouvert: bool
   async function valider(e: FormEvent) {
     e.preventDefault();
     try {
-      await post("/api/classes", { annee, nom: nom.trim(), niveau });
+      const primaire = ["CI", "CP", "CE1", "CE2", "CM1", "CM2"].includes(niveau);
+      await post("/api/classes", { annee, nom: nom.trim(), niveau, bareme: primaire ? 10 : 20 });
       toast.success(`Classe ${nom} créée`);
       rafraichir("classes", "tableau-de-bord");
       setNom("");
@@ -144,7 +145,7 @@ function NouvelleClasse({ annee, ouvert, fermer }: { annee: number; ouvert: bool
       <DialogContent>
         <DialogHeader><DialogTitle>Nouvelle classe</DialogTitle></DialogHeader>
         <form onSubmit={valider} className="space-y-4">
-          <Champ label="Niveau" aide="Sert à appliquer la bonne grille de frais.">
+          <Champ label="Niveau" aide="Sert à appliquer la bonne grille de frais et le barème (/10 à l'élémentaire, /20 ensuite).">
             <div className="flex flex-wrap gap-1.5">
               {NIVEAUX.map((n) => (
                 <button type="button" key={n} onClick={() => setNiveau(n)}

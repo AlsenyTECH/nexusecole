@@ -27,10 +27,15 @@ class Command(BaseCommand):
                 directeur={"email": "directeur@lycee-demo.sn", "mot_de_passe": "Demo-Nexus-2026",
                            "prenom": "Awa", "nom": "Diop"},
             )
-        if demo.remplir(Ecole.objects.get(schema_name="lycee_demo")):
+        ecole_demo = Ecole.objects.get(schema_name="lycee_demo")
+        if demo.remplir(ecole_demo):
             self.stdout.write("  Données de démonstration ajoutées (élèves, frais, paiements).")
+        if demo.remplir_pedagogie(ecole_demo):
+            self.stdout.write("  Pédagogie de démonstration ajoutée (matières, enseignants, notes, absences).")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
-            "\n  Caisse  : caisse@lycee-demo.sn / Demo-Nexus-2026\n"
+            "\n  Caisse  : caisse@lycee-demo.sn / Demo-Nexus-2026"
+            "\n  Prof    : prof@lycee-demo.sn / Demo-Nexus-2026 (mathématiques)"
+            "\n  Surveillant : surveillant@lycee-demo.sn / Demo-Nexus-2026 (6e A, 5e A)\n"
         ))

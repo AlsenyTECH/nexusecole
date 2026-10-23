@@ -22,6 +22,14 @@ aux couleurs de chaque école.
 |---|---|
 | ![Impayés](docs/captures/09-impayes.png) | ![Rôles](docs/captures/13-roles.png) |
 
+| Saisie des notes (professeur) | Résultats, rangs, conseil de classe |
+|---|---|
+| ![Saisie](docs/captures/23-saisie-notes.png) | ![Résultats](docs/captures/25-resultats.png) |
+
+| Bulletin signé avec QR code | Vérification publique du QR | Appel sur téléphone |
+|---|---|---|
+| ![Bulletin](docs/captures/26-bulletin.png) | ![Vérification](docs/captures/27-verification.png) | ![Appel](docs/captures/24-appel-mobile.png) |
+
 | Autre école, autres couleurs | Mode sombre | Téléphone |
 |---|---|---|
 | ![École bleue](docs/captures/22-ecole-bleue-accueil.png) | ![Sombre](docs/captures/14-accueil-sombre.png) | ![Mobile](docs/captures/17-mobile-accueil.png) |
@@ -53,6 +61,10 @@ ecole-y.nexusecole.sn ─┘                        │   TenantMainMiddleware :
 | Un compte école n'accède pas à la console, et inversement | utilisateurs propres à chaque schéma, permission `EstSuperAdmin` | `test_jeton_ecole_refuse_sur_console_admin`, `test_super_admin_refuse_sur_une_ecole` |
 | Impayé : lecture seule (les données restent consultables). Résiliation : blocage | permission `AbonnementValide` | `test_ecole_suspendue_en_lecture_seule`, `test_ecole_resiliee_bloquee` |
 | Respect des limites du forfait (élèves, modules) | `EleveSerializer.validate`, `ModuleActif` | `test_quota_eleves_du_forfait` |
+| Un enseignant ne note que ses cours ; un surveillant, ses classes | `peut_saisir_notes`, `peut_faire_l_appel` | `test_seul_le_prof_du_cours_ou_le_surveillant_affecte_saisit` |
+| Aucune note ne change après le conseil de classe | verrouillage par classe et période | `test_conseil_verrouille_et_emet_des_bulletins_signes` |
+| Toute modification de note est tracée et infalsifiable | journal chaîné (SHA-256 de la ligne précédente) | `test_journal_chaine_et_falsification_detectee` |
+| Un bulletin falsifié est détecté | signature Ed25519 (clé par école, dérivée par HKDF) + QR code | `test_bulletin_falsifie_detecte` |
 | Protection contre la force brute à la connexion | limite de 10 tentatives par minute | non testé |
 
 ## Démarrage avec Docker (recommandé, Windows / Mac / Linux)
@@ -72,9 +84,12 @@ Au premier lancement : base de données, plateforme, super-admin et école de d�
 | http://admin.localhost:5173 (console) | `admin@nexusecole.sn` / `Admin-Nexus-2026` |
 | http://lycee-demo.localhost:5173 (école, directeur) | `directeur@lycee-demo.sn` / `Demo-Nexus-2026` |
 | http://lycee-demo.localhost:5173 (école, caissier) | `caisse@lycee-demo.sn` / `Demo-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (professeur de maths) | `prof@lycee-demo.sn` / `Demo-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (surveillant 6e A, 5e A) | `surveillant@lycee-demo.sn` / `Demo-Nexus-2026` |
 
 L'école de démo est remplie automatiquement : année scolaire, 5 classes, grille des frais,
-16 élèves inscrits et quelques paiements.
+16 élèves inscrits, quelques paiements, les matières et enseignants, 3 trimestres,
+des notes en 6e A et quelques absences.
 
 Le code est monté dans les conteneurs : modifiez un fichier dans VS Code, l'application se recharge.
 
@@ -138,6 +153,19 @@ Lancer les tests : `cd backend && python manage.py test`
 | GET, PATCH | `/api/roles`, `/api/roles/{code}` | droits de chaque rôle (modifiables par le directeur) |
 | GET, POST, PATCH | `/api/personnel` | comptes du personnel |
 
+| GET, PATCH | `/api/pedagogie/parametres` | découpage, poids devoirs / composition, validation des notes du surveillant |
+| CRUD, POST | `/api/periodes`, `/api/periodes/generer` | trimestres ou semestres |
+| CRUD | `/api/matieres`, `/api/cours`, `/api/surveillances` | matières, cours (coef. + enseignant), surveillants par classe |
+| GET | `/api/cours/mes-cours` | cours où l'utilisateur peut saisir |
+| CRUD | `/api/evaluations` | devoirs et compositions |
+| GET, POST | `/api/evaluations/{id}/notes`, `/api/evaluations/{id}/valider` | grille de saisie, validation par l'enseignant |
+| GET, POST | `/api/appel` | appel d'une classe (matin / après-midi) |
+| GET, PATCH | `/api/absences` | absences, justification |
+| GET | `/api/resultats?classe=&periode=` | moyennes, rangs, mentions, statistiques |
+| POST | `/api/conseils` | conseil de classe : verrouillage + bulletins signés |
+| GET | `/api/bulletins`, `/api/pedagogie/journal` | bulletins émis, intégrité du journal des notes |
+| GET | `/api/verifier/{code}` | **public** : authenticité d'un bulletin (QR code) |
+
 Chaque route vérifie une **permission** (ex. `frais.encaisser`) ; le directeur règle les permissions
 de chaque rôle. Voir le [cahier des charges](docs/cahier-des-charges.md).
 
@@ -155,7 +183,7 @@ Paiement annuel (10 mois) : 2 mois offerts.
 
 - [x] **Phase 0 – Socle** : multi-tenant, marque blanche, console, forfaits, factures, tests d'isolation
 - [x] **Phase 1a** : droits configurables, inscriptions, frais, échéances, paiements, reçus, impayés, caisse (API)
-- [ ] **Phase 1b** : matières, cours, attributions, notes, bulletins PDF signés (QR code), absences
+- [x] **Phase 1b** : matières, cours, attributions, notes, moyennes et rangs, conseil de classe, bulletins signés (QR code), appel et absences
 - [x] **Phase 1c** : nouveau design inspiré d'AP2A Impact (écrans école et console)
 - [ ] **Phase 2 – Parents** : PWA parents, SMS/WhatsApp, paiement Wave / Orange Money
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
