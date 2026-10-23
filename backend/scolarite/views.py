@@ -4,12 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from clients.models import Module
-from comptes.models import Role
-from comptes.permissions import PERSONNEL, AbonnementValide, ModuleActif, roles
+from comptes.permissions import AbonnementValide, ModuleActif, permission
 
-from .models import AnneeScolaire, Classe, Eleve
-
-ADMINISTRATION = (Role.DIRECTEUR, Role.SECRETAIRE)
+from .models import AnneeScolaire, Classe, Eleve, Inscription
 
 
 class ConfigEcoleView(APIView):
@@ -64,7 +61,7 @@ class EleveSerializer(serializers.ModelSerializer):
 
 class BaseEcoleViewSet(viewsets.ModelViewSet):
     module_requis = Module.SCOLARITE
-    permission_classes = [AbonnementValide, ModuleActif, roles(lecture=PERSONNEL, ecriture=ADMINISTRATION)]
+    permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "scolarite.parametrer")]
 
 
 class AnneeScolaireViewSet(BaseEcoleViewSet):
@@ -80,6 +77,7 @@ class ClasseViewSet(BaseEcoleViewSet):
 class EleveViewSet(BaseEcoleViewSet):
     queryset = Eleve.objects.select_related("classe")
     serializer_class = EleveSerializer
+    permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "eleves.gerer")]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -88,3 +86,47 @@ class EleveViewSet(BaseEcoleViewSet):
         if q := self.request.query_params.get("q"):
             qs = qs.filter(nom__icontains=q) | qs.filter(prenom__icontains=q) | qs.filter(matricule__icontains=q)
         return qs
+
+
+class InscriptionSerializer(serializers.ModelSerializer):
+    eleve_nom = serializers.CharField(source="eleve.__str__", read_only=True)
+    classe_nom = serializers.CharField(source="classe.nom", read_only=True)
+
+    class Meta:
+        model = Inscription
+        fields = ["id", "eleve", "eleve_nom", "classe", "classe_nom", "annee", "date_inscription", "statut",
+                  "reduction_pct", "motif_reduction"]
+        read_only_fields = ["annee", "date_inscription"]
+
+    def validate(self, attrs):
+        eleve = attrs.get("eleve", getattr(self.instance, "eleve", None))
+        classe = attrs.get("classe", getattr(self.instance, "classe", None))
+        doublon = Inscription.objects.filter(eleve=eleve, annee=classe.annee).exclude(pk=getattr(self.instance, "pk", None))
+        if doublon.exists():
+            raise serializers.ValidationError("Cet élève est déjà inscrit pour cette année scolaire.")
+        return attrs
+
+
+class InscriptionViewSet(BaseEcoleViewSet):
+    """À la création, les échéances de l'élève sont générées depuis la grille des frais."""
+
+    queryset = Inscription.objects.select_related("eleve", "classe")
+    serializer_class = InscriptionSerializer
+    permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "inscriptions.gerer")]
+    http_method_names = ["get", "post", "patch", "head", "options"]  # une inscription ne se supprime pas
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        for param in ("classe", "annee", "eleve", "statut"):
+            if valeur := self.request.query_params.get(param):
+                qs = qs.filter(**{param: valeur})
+        return qs
+
+    def perform_create(self, serializer):
+        from finances.services import generer_echeances
+
+        inscription = serializer.save()
+        # Mise à jour de la classe courante de l'élève (affichage rapide)
+        Eleve.objects.filter(pk=inscription.eleve_id).update(classe=inscription.classe)
+        if self.request.tenant.a_module(Module.FRAIS):
+            generer_echeances(inscription)

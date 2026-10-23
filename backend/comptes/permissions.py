@@ -3,8 +3,6 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .models import Role
 
-PERSONNEL = (Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE, Role.ENSEIGNANT, Role.SURVEILLANT)
-
 
 class EstSuperAdmin(BasePermission):
     """Console NexusEcole : uniquement sur le schéma public, uniquement les super-admins."""
@@ -39,18 +37,24 @@ class AbonnementValide(BasePermission):
         return True
 
 
-def roles(lecture, ecriture=()):
-    """Fabrique une permission par rôle : roles(lecture=PERSONNEL, ecriture=(Role.DIRECTEUR,))."""
+def permission(lecture, ecriture=None):
+    """
+    Permission configurable : permission("eleves.voir", "eleves.gerer").
+    `lecture` pour GET/HEAD/OPTIONS, `ecriture` pour le reste (par défaut la même).
+    """
 
-    class _Roles(BasePermission):
+    class _Permission(BasePermission):
+        message = "Vous n'avez pas le droit d'effectuer cette action."
+
         def has_permission(self, request, view):
             user = request.user
             if not (user and user.is_authenticated):
                 return False
-            autorises = lecture if request.method in SAFE_METHODS else ecriture
-            return user.role in autorises
+            code = lecture if request.method in SAFE_METHODS else (ecriture or lecture)
+            return user.a_permission(code)
 
-    return _Roles
+    _Permission.__name__ = f"Permission_{lecture}"
+    return _Permission
 
 
 class ModuleActif(BasePermission):

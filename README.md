@@ -113,7 +113,18 @@ Lancer les tests : `cd backend && python manage.py test`
 | GET | `/api/ecole/config` | configuration de la marque blanche (publique, lue avant connexion) |
 | POST | `/api/auth/connexion`, `/api/auth/rafraichir` | jetons JWT liés à l'école |
 | GET | `/api/moi` | utilisateur connecté |
-| CRUD | `/api/annees`, `/api/classes`, `/api/eleves` | scolarité (écriture réservée à la direction et au secrétariat) |
+| CRUD | `/api/annees`, `/api/classes`, `/api/eleves` | scolarité |
+| GET, POST, PATCH | `/api/inscriptions` | inscriptions (génèrent les échéances) |
+| GET | `/api/inscriptions/{id}/situation` | échéances, payé, reste, retard d'un élève |
+| CRUD | `/api/frais` | grille des frais de l'année |
+| GET, POST | `/api/paiements` | encaisser (imputation automatique, reçu numéroté) |
+| POST, GET | `/api/paiements/{id}/annuler`, `/api/paiements/{id}/recu` | annulation avec motif, données du reçu |
+| GET | `/api/finances/impayes`, `/api/finances/caisse?date=` | impayés, caisse du jour |
+| GET, PATCH | `/api/roles`, `/api/roles/{code}` | droits de chaque rôle (modifiables par le directeur) |
+| GET, POST, PATCH | `/api/personnel` | comptes du personnel |
+
+Chaque route vérifie une **permission** (ex. `frais.encaisser`) ; le directeur règle les permissions
+de chaque rôle. Voir le [cahier des charges](docs/cahier-des-charges.md).
 
 ## Forfaits par défaut
 
@@ -128,7 +139,9 @@ Paiement annuel (10 mois) : 2 mois offerts.
 ## Feuille de route
 
 - [x] **Phase 0 – Socle** : multi-tenant, marque blanche, console, forfaits, factures, tests d'isolation
-- [ ] **Phase 1 – MVP école** : frais scolaires et reçus, notes, bulletins PDF signés (QR code), absences
+- [x] **Phase 1a** : droits configurables, inscriptions, frais, échéances, paiements, reçus, impayés, caisse (API)
+- [ ] **Phase 1b** : matières, cours, attributions, notes, bulletins PDF signés (QR code), absences
+- [ ] **Phase 1c** : nouveau design inspiré d'AP2A Impact
 - [ ] **Phase 2 – Parents** : PWA parents, SMS/WhatsApp, paiement Wave / Orange Money
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants

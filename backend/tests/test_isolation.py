@@ -48,7 +48,9 @@ class BaseMultiEcole(TestCase):
         for ecole in Ecole.objects.exclude(schema_name="public"):
             ecole.delete(force_drop=True)
         Ecole.objects.all().delete()
-        Utilisateur.objects.all().delete()
+        # SQL direct : la cascade de l'ORM chercherait des tables d'école (paiements…) dans le schéma public
+        with connection.cursor() as c:
+            c.execute("DELETE FROM comptes_utilisateur")
         Forfait.objects.all().delete()
 
     def setUp(self):

@@ -18,6 +18,7 @@ class Role(models.TextChoices):
     ENSEIGNANT = "enseignant", "Enseignant"
     SURVEILLANT = "surveillant", "Surveillant / Censeur"
     PARENT = "parent", "Parent"
+    ELEVE = "eleve", "Élève"
 
 
 class UtilisateurManager(BaseUserManager):
@@ -58,3 +59,36 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.prenom} {self.nom} <{self.email}>".strip()
+
+    @property
+    def nom_complet(self):
+        return f"{self.prenom} {self.nom}".strip() or self.email
+
+    def permissions_ecole(self):
+        """Permissions du rôle de l'utilisateur dans l'école courante (mises en cache sur l'objet)."""
+        if not hasattr(self, "_permissions_ecole"):
+            from .droits import PERMISSIONS, ROLES_TOUS_DROITS
+
+            if self.role in ROLES_TOUS_DROITS:
+                self._permissions_ecole = set(PERMISSIONS)
+            else:
+                role = RoleEcole.objects.filter(code=self.role).first()
+                self._permissions_ecole = set(role.permissions) if role else set()
+        return self._permissions_ecole
+
+    def a_permission(self, code):
+        return self.is_active and code in self.permissions_ecole()
+
+
+class RoleEcole(models.Model):
+    """Droits d'un rôle dans une école, modifiables par le directeur."""
+
+    code = models.CharField(max_length=15, choices=Role.choices, unique=True)
+    permissions = models.JSONField(default=list)
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self):
+        return self.get_code_display()
