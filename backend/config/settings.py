@@ -70,7 +70,9 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = False
 AUTH_USER_MODEL = "comptes.Utilisateur"
 
 MIDDLEWARE = [
-    # Doit rester en premier : résout le sous-domaine → schéma de l'école
+    # Avant tout : réponse interne à Caddy (certificats HTTPS), indépendante de l'école
+    "config.tls.AutorisationTLSMiddleware",
+    # Résout le sous-domaine → schéma de l'école
     "django_tenants.middleware.main.TenantMainMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -139,8 +141,16 @@ USE_TZ = True
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    # La redirection HTTP → HTTPS est faite par Caddy, en façade
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+}

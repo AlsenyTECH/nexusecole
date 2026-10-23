@@ -189,10 +189,18 @@ Paiement annuel (10 mois) : 2 mois offerts.
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants
 
-## Production (exemple)
+## Mise en production
 
-- DNS : `*.nexusecole.sn` et `admin.nexusecole.sn` pointent vers le serveur, avec un certificat TLS wildcard.
-- Variables : `DEBUG=false`, `SECRET_KEY`, `DATABASE_URL`, `BASE_DOMAIN=nexusecole.sn`, `PUBLIC_DOMAIN=admin.nexusecole.sn`, `ALLOWED_HOSTS=.nexusecole.sn`.
-- À chaque déploiement : `python manage.py migrate_schemas`, qui migre le schéma public **et** toutes les écoles.
-- **Instance dédiée** : même image, autre base. Pour y transférer une école : `pg_dump -n <schema>`.
-- Données personnelles : déclarer le traitement auprès de la CDP (loi n° 2008-12).
+Tout est prêt pour un serveur (VPS) : **[guide pas à pas](docs/deploiement.md)**.
+
+```bash
+cp deploy/env.production.example .env   # domaine + secrets
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend python manage.py init_plateforme --email vous@domaine
+```
+
+- **Caddy** en façade : HTTPS automatique pour chaque école (certificat à la demande, uniquement pour
+  les domaines déclarés dans la console), interface React servie en fichiers statiques
+- **gunicorn** pour l'API ; migrations de toutes les écoles au démarrage
+- **Sauvegarde quotidienne** de toute la base, conservée 14 jours, restauration testée
+- DNS : `A @` et `A *` vers l'IP du serveur

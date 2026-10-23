@@ -181,3 +181,21 @@ class ConsoleAdminTests(BaseMultiEcole):
         r = self.get(HOTE_ADMIN, "/api/admin/statistiques", acces)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["ecoles_total"], 2)
+
+
+class CertificatsTests(BaseMultiEcole):
+    """Caddy ne doit obtenir de certificat HTTPS que pour les domaines déclarés."""
+
+    def test_domaines_connus_autorises(self):
+        c = APIClient()
+        for hote in (HOTE_A, HOTE_ADMIN, "LYCEE-A.localhost."):
+            self.assertEqual(c.get(f"/interne/tls-autorise?domain={hote}").status_code, 200, hote)
+
+    def test_domaine_inconnu_refuse(self):
+        c = APIClient()
+        self.assertEqual(c.get("/interne/tls-autorise?domain=pirate.example.com").status_code, 404)
+        self.assertEqual(c.get("/interne/tls-autorise").status_code, 404)
+
+    def test_inaccessible_a_travers_le_proxy(self):
+        r = APIClient().get(f"/interne/tls-autorise?domain={HOTE_A}", HTTP_X_FORWARDED_FOR="1.2.3.4")
+        self.assertEqual(r.status_code, 403)

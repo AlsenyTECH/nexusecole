@@ -1,0 +1,70 @@
+# Production : docker compose -f docker-compose.prod.yml up -d --build
+# Prérequis : un fichier .env (copié de deploy/env.production.example) et le DNS pointant vers le serveur.
+# Nom de projet distinct : conteneurs et volumes séparés de l'environnement de développement
+name: nexusecole-prod
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: nexusecole
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexusecole"]
+      interval: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DEBUG: "false"
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD}@db:5432/nexusecole
+    # Migre le schéma public ET toutes les écoles à chaque démarrage, puis lance l'API
+    command: >
+      sh -c "python manage.py migrate_schemas --noinput &&
+             gunicorn config.wsgi --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout 60 --access-logfile -"
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?définir ACME_EMAIL dans .env}
+      CADDY_OPTIONS_GLOBALES: ${CADDY_OPTIONS_GLOBALES:-}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: [caddy_data:/data, caddy_config:/config]
+    depends_on: [backend]
+
+  # Sauvegarde quotidienne de toute la base (toutes les écoles), conservée 14 jours
+  sauvegarde:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [./sauvegardes:/sauvegardes]
+    entrypoint: >
+      sh -c 'while true; do
+        f=/sauvegardes/nexusecole-$$(date +%Y-%m-%d-%H%M).dump;
+        if pg_dump -Fc -h db -U nexus nexusecole > $$f.partiel; then
+          mv $$f.partiel $$f && echo "Sauvegarde : $$f";
+        else
+          echo "ECHEC de la sauvegarde" >&2;
+        fi;
+        find /sauvegardes -name "*.partiel" -delete;
+        find /sauvegardes -name "*.dump" -mtime +14 -delete;
+        sleep 86400; done'
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
