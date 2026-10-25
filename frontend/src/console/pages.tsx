@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { api, messageErreur, post, type Page } from "@/lib/api";
 import { date, fcfa } from "@/lib/format";
 import { useRafraichir } from "@/lib/requetes";
+import { adresseEcole, espace } from "@/lib/ecole";
 
 type Ecole = { id: number; nom: string; domaine: string; statut: string; forfait: string | null; ville: string; fin_essai: string | null; couleur_primaire: string };
 type Forfait = { code: string; nom: string; prix_mensuel: number; max_eleves: number | null };
@@ -22,7 +23,6 @@ const STATUTS: Record<string, [string, "vert" | "bleu" | "or" | "rouge" | "gris"
   emise: ["Émise", "bleu"], payee: ["Payée", "vert"], en_retard: ["En retard", "rouge"], annulee: ["Annulée", "gris"],
 };
 const Statut = ({ s }: { s: string }) => <Pastille ton={STATUTS[s]?.[1] ?? "gris"}>{STATUTS[s]?.[0] ?? s}</Pastille>;
-const lienEcole = (domaine: string) => `${location.protocol}//${domaine}${location.port ? `:${location.port}` : ""}`;
 
 export function AccueilConsole() {
   const { data: s } = useQuery({ queryKey: ["stats"], queryFn: () => api<Stats>("/api/admin/statistiques") });
@@ -80,7 +80,7 @@ export function Ecoles() {
               <span className="size-3 shrink-0 rounded-full" style={{ background: e.couleur_primaire }} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{e.nom}</div>
-                <a href={lienEcole(e.domaine)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">{e.domaine} <ExternalLink className="size-3" /></a>
+                <a href={adresseEcole(e.domaine)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">{adresseEcole(e.domaine).replace(/^https?:\/\//, "")} <ExternalLink className="size-3" /></a>
               </div>
               <span className="text-sm text-muted-foreground">{e.forfait ?? "—"}</span>
               <div className="flex flex-col items-end"><Statut s={e.statut} />{e.statut === "essai" && e.fin_essai ? <span className="mt-0.5 text-[11px] text-muted-foreground">jusqu'au {date(e.fin_essai)}</span> : null}</div>
@@ -135,7 +135,7 @@ function NouvelleEcole({ ouvert, fermer }: { ouvert: boolean; fermer: () => void
         </DialogHeader>
         <form onSubmit={valider} className="grid gap-4 sm:grid-cols-2">
           <Champ label="Nom de l'école" className="sm:col-span-2"><Input required {...champ("nom")} placeholder="Institution Sainte-Marie" /></Champ>
-          <Champ label="Sous-domaine" aide={f.sous_domaine ? `${f.sous_domaine}.nexusecole.sn` : "lettres, chiffres et tirets"}>
+          <Champ label="Sous-domaine" aide={f.sous_domaine ? (espace.code === "admin" ? `${location.host}/e/${f.sous_domaine}` : `${f.sous_domaine}.nexusecole.sn`) : "lettres, chiffres et tirets"}>
             <Input required pattern="[a-z0-9-]{3,40}" {...champ("sous_domaine")} />
           </Champ>
           <Champ label="Ville"><Input {...champ("ville")} /></Champ>

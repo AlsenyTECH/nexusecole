@@ -1,6 +1,9 @@
 // Client de l'API. Les jetons restent dans l'onglet (sessionStorage) ; ils sont liés à l'école
 // côté serveur (claim `schema`), donc inutilisables sur une autre école.
-const CLE = "nexus.jetons";
+import { espace } from "./ecole";
+
+// Une clé par école : en mode chemin, plusieurs écoles partagent la même adresse (même sessionStorage).
+const CLE = `nexus.jetons.${espace.code ?? "hote"}`;
 
 type Jetons = { access: string; refresh: string };
 
@@ -48,6 +51,7 @@ export const messageErreur = (e: unknown) => (e instanceof Error ? e.message : S
 async function brut(chemin: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
+  if (espace.code) headers.set("X-Ecole", espace.code);
   if (jetons) headers.set("Authorization", `Bearer ${jetons.access}`);
   return fetch(chemin, { ...init, headers });
 }
@@ -56,7 +60,7 @@ async function rafraichir(): Promise<boolean> {
   if (!jetons) return false;
   const r = await fetch("/api/auth/rafraichir", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(espace.code ? { "X-Ecole": espace.code } : {}) },
     body: JSON.stringify({ refresh: jetons.refresh }),
   });
   if (!r.ok) {

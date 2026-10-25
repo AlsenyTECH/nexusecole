@@ -1,5 +1,7 @@
 # Mise en ligne gratuite : Oracle Cloud + DuckDNS
 
+> Oracle demande une carte bancaire. Sans carte, voir plutôt [Render + Neon](deploiement-render.md).
+
 Objectif : NexusEcole en ligne, **gratuitement**, avec HTTPS, pour faire des démonstrations
 et accueillir des écoles pilotes.
 

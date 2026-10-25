@@ -8,6 +8,8 @@ import { AuthProvider } from "@/lib/auth";
 import { appliquerMode, modeEnregistre } from "@/lib/theme";
 import { ConsoleApp } from "@/console/ConsoleApp";
 import { EcoleApp } from "@/EcoleApp";
+import { espace } from "@/lib/ecole";
+import { Portail } from "@/Portail";
 import "./index.css";
 
 appliquerMode(modeEnregistre());
@@ -23,15 +25,15 @@ const client = new QueryClient({
   },
 });
 
-// Un seul build : le sous-domaine décide si l'on affiche la console NexusEcole ou l'espace d'une école.
-const estConsole = window.location.hostname.startsWith("admin.");
+// Un seul build : le sous-domaine (ou le chemin /e/<école>, /console) décide de l'espace affiché.
+const Application = { console: ConsoleApp, ecole: EcoleApp, portail: Portail }[espace.type];
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <BrowserRouter>
+      <BrowserRouter basename={espace.base || undefined}>
         <AuthProvider>
-          {estConsole ? <ConsoleApp /> : <EcoleApp />}
+          <Application />
           <Toaster position="top-center" richColors />
         </AuthProvider>
       </BrowserRouter>

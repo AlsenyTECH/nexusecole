@@ -30,6 +30,10 @@ BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 # Domaine de la console super-admin (schéma public)
 PUBLIC_DOMAIN = os.environ.get("PUBLIC_DOMAIN", f"admin.{BASE_DOMAIN}")
 # Sous-domaines interdits aux écoles
+# Hébergement gratuit à adresse unique : l'école est indiquée par l'en-tête X-Ecole (voir config/ecole_middleware.py)
+ECOLE_PAR_EN_TETE = env_bool("ECOLE_PAR_EN_TETE", False)
+# Dossier de l'interface compilée, servie par Django quand aucun serveur web n'est devant (Render)
+FRONTEND_DIST = os.environ.get("FRONTEND_DIST", "")
 RESERVED_SUBDOMAINS = {"admin", "www", "api", "public", "app", "static", "mail"}
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", f".{BASE_DOMAIN},{BASE_DOMAIN},testserver")
@@ -70,10 +74,14 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = False
 AUTH_USER_MODEL = "comptes.Utilisateur"
 
 MIDDLEWARE = [
+    # Interface React (seulement si FRONTEND_DIST est défini : hébergement à service unique)
+    "config.spa.InterfaceMiddleware",
+    # Sonde de santé de l'hébergeur (aucune école à résoudre)
+    "config.sante.SantePlateformeMiddleware",
     # Avant tout : réponse interne à Caddy (certificats HTTPS), indépendante de l'école
     "config.tls.AutorisationTLSMiddleware",
-    # Résout le sous-domaine → schéma de l'école
-    "django_tenants.middleware.main.TenantMainMiddleware",
+    # Résout l'école (sous-domaine, ou en-tête X-Ecole en mode « chemin ») → schéma PostgreSQL
+    "config.ecole_middleware.EcoleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -91,6 +99,8 @@ DATABASES = {
         os.environ.get("DATABASE_URL", "postgres://nexus:nexus@localhost:5432/nexusecole"),
         engine="django_tenants.postgresql_backend",
         conn_max_age=60,
+        # Les bases hébergées (Neon…) coupent les connexions inactives : on vérifie avant réutilisation
+        conn_health_checks=True,
     )
 }
 DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)

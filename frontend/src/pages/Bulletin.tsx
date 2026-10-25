@@ -5,6 +5,7 @@ import { Printer } from "lucide-react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { espace } from "@/lib/ecole";
 import { date } from "@/lib/format";
 import { note, rang } from "@/lib/requetes";
 import type { Bulletin as TBulletin } from "@/lib/types";
@@ -14,7 +15,7 @@ export function Bulletin() {
   const { id } = useParams();
   const { data: b, isError } = useQuery({ queryKey: ["bulletin", id], queryFn: () => api<TBulletin>(`/api/bulletins/${id}`) });
   const [qr, setQr] = useState("");
-  const lien = b ? `${location.origin}/verifier/${b.code}` : "";
+  const lien = b ? `${location.origin}${espace.base}/verifier/${b.code}` : "";
   useEffect(() => { if (lien) QRCode.toDataURL(lien, { margin: 1, width: 220 }).then(setQr); }, [lien]);
 
   if (isError) return <p className="p-8 text-center text-muted-foreground">Bulletin introuvable ou accès refusé.</p>;

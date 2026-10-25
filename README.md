@@ -192,8 +192,10 @@ Paiement annuel (10 mois) : 2 mois offerts.
 ## Mise en production
 
 Tout est prêt pour un serveur (VPS) : **[guide pas à pas](docs/deploiement.md)**.
-Pour démarrer **gratuitement** (Oracle Cloud « Always Free » + domaine DuckDNS) : **[guide gratuit](docs/deploiement-gratuit.md)**,
-avec un script qui prépare le serveur en une commande (`sudo bash deploy/preparer-serveur.sh`).
+Pour démarrer **gratuitement** :
+- **sans carte bancaire ni serveur** (Render + Neon, écoles sur `/e/<code>`) : **[guide Render](docs/deploiement-render.md)** — le plus simple ;
+- avec votre propre serveur gratuit (Oracle Cloud « Always Free » + DuckDNS, carte bancaire demandée) :
+  **[guide Oracle](docs/deploiement-gratuit.md)**, avec un script qui prépare le serveur en une commande.
 
 ```bash
 cp deploy/env.production.example .env   # domaine + secrets

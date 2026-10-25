@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { espace } from './ecole'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -10,5 +11,5 @@ export function cn(...inputs: ClassValue[]) {
  * window.open copie le sessionStorage de l'onglet courant, un lien target="_blank" rel="noreferrer" non.
  */
 export function ouvrirDocument(chemin: string) {
-  window.open(chemin, "_blank");
+  window.open(`${espace.base}${chemin}`, "_blank");
 }
