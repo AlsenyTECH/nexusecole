@@ -158,19 +158,24 @@ class DroitsTests(BaseFinances):
         self.assertEqual(self.payer(prof, insc, 1_000).status_code, 403)
         self.assertEqual(prof.get("/api/roles").status_code, 403)
 
+    def role(self, code):
+        return next(r["id"] for r in self.dir.get("/api/roles").json()["roles"] if r["code"] == code)
+
     def test_le_directeur_modifie_les_droits_d_un_role(self):
         insc = self.inscrire()
-        r = self.dir.patch("/api/roles/comptable", {"permissions": ["frais.voir"]}, format="json")
+        r = self.dir.patch(f"/api/roles/{self.role('comptable')}", {"permissions": ["frais.voir"]}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         caisse = self.auth(HOTE_A, "caisse@a.sn")
         self.assertEqual(self.payer(caisse, insc, 1_000).status_code, 403)
         self.assertEqual(caisse.get("/api/moi").json()["permissions"], ["frais.voir"])
 
     def test_droits_du_directeur_non_modifiables(self):
-        self.assertEqual(self.dir.patch("/api/roles/directeur", {"permissions": []}, format="json").status_code, 400)
+        r = self.dir.patch(f"/api/roles/{self.role('directeur')}", {"permissions": []}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.dir.delete(f"/api/roles/{self.role('comptable')}").status_code, 400)  # rôle d'origine
 
     def test_permission_inconnue_refusee(self):
-        r = self.dir.patch("/api/roles/comptable", {"permissions": ["tout.faire"]}, format="json")
+        r = self.dir.patch(f"/api/roles/{self.role('comptable')}", {"permissions": ["tout.faire"]}, format="json")
         self.assertEqual(r.status_code, 400)
 
     def test_pas_d_elevation_de_privileges(self):
@@ -183,14 +188,17 @@ class DroitsTests(BaseFinances):
         moi = secret.get("/api/moi").json()["id"]
         r = secret.patch(f"/api/personnel/{moi}", {"role": "comptable"}, format="json")
         self.assertEqual(r.status_code, 400)
-        r = secret.post("/api/personnel", {"email": "prof2@a.sn", "role": "enseignant", "mot_de_passe": MDP},
-                        format="json")
-        self.assertEqual(r.status_code, 201, r.content)
+        # Créer un enseignant donnerait des droits (notes, appel) que ce compte n'a pas lui-même
+        r = secret.post("/api/enseignants", {"email": "prof2@a.sn", "mot_de_passe": MDP}, format="json")
+        self.assertEqual(r.status_code, 403)
+        r = secret.post("/api/personnel", {"email": "aide@a.sn", "role": "secretaire", "mot_de_passe": MDP}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)  # un rôle dont il a tous les droits
 
     def test_roles_installes_dans_chaque_ecole(self):
         roles = self.dir.get("/api/roles").json()["roles"]
         codes = {r["code"] for r in roles}
-        self.assertTrue({"directeur", "comptable", "parent", "eleve"} <= codes)
+        self.assertTrue({"directeur", "secretaire", "comptable", "enseignant", "surveillant"} <= codes)
+        self.assertFalse({"parent", "eleve"} & codes)  # l'espace famille n'a pas de droits de gestion
         self.assertNotIn("superadmin", codes)
 
 

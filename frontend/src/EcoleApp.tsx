@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, ClipboardList, FileText, GraduationCap, Home, Layers, ReceiptText, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, FileText, GraduationCap, Home, Layers, Presentation, ReceiptText, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
 import { Connexion } from "@/components/Connexion";
 import { Layout, type Groupe } from "@/components/Layout";
 import { api } from "@/lib/api";
@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { appliquerCouleurs } from "@/lib/couleurs";
 import { ROLES } from "@/lib/format";
 import type { Config } from "@/lib/types";
+import { FamilleApp } from "@/famille/FamilleApp";
 import { Accueil } from "@/pages/Accueil";
 import { Appel } from "@/pages/Appel";
 import { Bulletin } from "@/pages/Bulletin";
@@ -17,6 +18,8 @@ import { Classes } from "@/pages/Classes";
 import { Cours } from "@/pages/Cours";
 import { EleveDetail } from "@/pages/EleveDetail";
 import { Eleves } from "@/pages/Eleves";
+import { EmploiDuTemps } from "@/pages/EmploiDuTemps";
+import { Enseignants } from "@/pages/Enseignants";
 import { GrilleFrais } from "@/pages/GrilleFrais";
 import { Impayes } from "@/pages/Impayes";
 import { Notes } from "@/pages/Notes";
@@ -63,6 +66,9 @@ export function EcoleApp() {
     );
   }
 
+  // Parents et tuteurs : leur propre espace, limité aux élèves qui leur sont rattachés
+  if (moi.role === "parent") return <FamilleApp config={config} />;
+
   const frais = config.modules.includes("frais");
   const notes = config.modules.includes("notes");
   const absences = config.modules.includes("absences");
@@ -87,6 +93,7 @@ export function EcoleApp() {
       liens: [
         { vers: "/notes", libelle: "Notes", icone: ClipboardList, visible: notes && (peut("notes.saisir") || peut("notes.saisir_toutes")) },
         { vers: "/appel", libelle: "Appel", icone: UserCheck, visible: absences && peut("absences.saisir") },
+        { vers: "/emploi-du-temps", libelle: "Emploi du temps", icone: CalendarDays, visible: notes && peut("eleves.voir") },
         { vers: "/resultats", libelle: "Résultats et bulletins", icone: FileText, visible: notes && peut("notes.voir") },
         { vers: "/cours", libelle: "Matières et cours", icone: BookOpenCheck, visible: notes && peut("scolarite.parametrer") },
       ],
@@ -98,6 +105,7 @@ export function EcoleApp() {
     {
       titre: "Réglages",
       liens: [
+        { vers: "/enseignants", libelle: "Enseignants", icone: Presentation, visible: peut("utilisateurs.gerer") },
         { vers: "/personnel", libelle: "Personnel", icone: UsersRound, visible: peut("utilisateurs.gerer") },
         { vers: "/roles", libelle: "Rôles et droits", icone: ShieldCheck, visible: peut("roles.gerer") },
       ],
@@ -121,7 +129,7 @@ export function EcoleApp() {
             groupes={groupes}
             bas={["/", "/notes", "/appel", "/eleves", "/caisse", "/impayes"]}
             marque={{ nom: config.nom, sousTitre: config.ville || "Espace établissement", logo: config.logo_url || undefined }}
-            utilisateur={{ prenom: moi.prenom, nom: moi.nom || moi.email, detail: ROLES[moi.role] ?? moi.role }}
+            utilisateur={{ prenom: moi.prenom, nom: moi.nom || moi.email, detail: moi.role_nom || ROLES[moi.role] || moi.role }}
             deconnecter={deconnecter}
             bandeau={lectureSeule}
           />
@@ -138,6 +146,8 @@ export function EcoleApp() {
         <Route path="appel" element={<Appel />} />
         <Route path="resultats" element={<Resultats />} />
         <Route path="cours" element={<Cours />} />
+        <Route path="emploi-du-temps" element={<EmploiDuTemps />} />
+        <Route path="enseignants" element={<Enseignants />} />
         <Route path="personnel" element={<Personnel />} />
         <Route path="roles" element={<Roles />} />
         <Route path="*" element={<Navigate to="/" replace />} />

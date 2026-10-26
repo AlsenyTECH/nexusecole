@@ -153,25 +153,28 @@ class PaiementViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     @action(detail=True, methods=["get"])
     def recu(self, request, pk=None):
-        p = self.get_object()
-        ecole = request.tenant
-        return Response({
-            "ecole": {"nom": ecole.nom, "ville": ecole.ville, "telephone": ecole.telephone, "logo_url": ecole.logo_url},
-            "numero": p.numero_recu,
-            "date": p.encaisse_le,
-            "eleve": str(p.inscription.eleve),
-            "classe": p.inscription.classe.nom,
-            "annee": str(p.inscription.annee),
-            "montant": p.montant,
-            "moyen": p.get_moyen_display(),
-            "reference": p.reference,
-            "detail": [{"libelle": i.echeance.libelle, "montant": i.montant}
-                       for i in p.imputations.select_related("echeance")],
-            "encaisse_par": p.encaisse_par.nom_complet,
-            "annule": p.annule,
-            "motif_annulation": p.motif_annulation,
-            "reste_du": services.situation(p.inscription)["reste"],
-        })
+        return Response(donnees_recu(self.get_object(), request.tenant))
+
+
+def donnees_recu(p, ecole):
+    """Contenu d'un reçu (aussi servi aux familles pour les paiements de leurs enfants)."""
+    return {
+        "ecole": {"nom": ecole.nom, "ville": ecole.ville, "telephone": ecole.telephone, "logo_url": ecole.logo_url},
+        "numero": p.numero_recu,
+        "date": p.encaisse_le,
+        "eleve": str(p.inscription.eleve),
+        "classe": p.inscription.classe.nom,
+        "annee": str(p.inscription.annee),
+        "montant": p.montant,
+        "moyen": p.get_moyen_display(),
+        "reference": p.reference,
+        "detail": [{"libelle": i.echeance.libelle, "montant": i.montant}
+                   for i in p.imputations.select_related("echeance")],
+        "encaisse_par": p.encaisse_par.nom_complet,
+        "annule": p.annule,
+        "motif_annulation": p.motif_annulation,
+        "reste_du": services.situation(p.inscription)["reste"],
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -189,6 +192,7 @@ class ImpayesView(APIView):
                                     inscription__statut=Inscription.Statut.ACTIVE)
             .avec_soldes().filter(reste__gt=0)
             .select_related("inscription__eleve", "inscription__classe")
+            .prefetch_related("inscription__eleve__liens__responsable")
         )
         if classe := request.query_params.get("classe"):
             echues = echues.filter(inscription__classe=classe)
@@ -197,7 +201,7 @@ class ImpayesView(APIView):
             insc = e.inscription
             ligne = par_eleve[insc.pk]
             ligne.update(inscription=insc.pk, eleve_id=insc.eleve_id, eleve=str(insc.eleve), classe=insc.classe.nom,
-                         telephone_parent=insc.eleve.telephone_parent)
+                         telephone_parent=insc.eleve.telephone_contact)
             ligne["montant"] += e.reste
             ligne["echeances"] += 1
             ligne["depuis"] = min(filter(None, [ligne["depuis"], e.date_limite]))

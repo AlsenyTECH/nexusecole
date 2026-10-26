@@ -50,3 +50,19 @@ export function periodeCourante(periodes: import("./types").Periode[] | undefine
 export const rang = (r: number | null | undefined) => (r == null ? "—" : r === 1 ? "1er" : `${r}e`);
 
 export const note = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("fr-FR", { maximumFractionDigits: 2 }));
+
+/** Rôles de l'école, pour les attribuer (Personnel, Enseignants). */
+export function useRoles() {
+  return useQuery({
+    queryKey: ["roles"],
+    queryFn: () => api<{ permissions: import("./types").Droit[]; roles: import("./types").RoleEcole[] }>("/api/roles"),
+    select: (d) => d.roles,
+  });
+}
+
+export function useMatieres() {
+  return useQuery({
+    queryKey: ["matieres"],
+    queryFn: async () => (await api<Page<import("./types").Matiere>>("/api/matieres?page_size=200")).results,
+  });
+}

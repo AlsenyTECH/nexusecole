@@ -12,9 +12,12 @@ type DonneesRecu = {
 };
 
 /** Reçu imprimable (A5), toujours en clair même en mode sombre. */
-export function Recu() {
+export function Recu({ famille = false }: { famille?: boolean }) {
   const { id } = useParams();
-  const { data: r, isError } = useQuery({ queryKey: ["recu", id], queryFn: () => api<DonneesRecu>(`/api/paiements/${id}/recu`) });
+  const { data: r, isError } = useQuery({
+    queryKey: ["recu", id],
+    queryFn: () => api<DonneesRecu>(famille ? `/api/famille/recus/${id}` : `/api/paiements/${id}/recu`),
+  });
   if (isError) return <p className="p-8 text-center text-muted-foreground">Reçu introuvable ou accès refusé.</p>;
   if (!r) return <p className="p-8 text-center text-muted-foreground">Chargement…</p>;
 

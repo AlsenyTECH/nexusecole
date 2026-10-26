@@ -14,9 +14,11 @@ from rest_framework.views import APIView
 from clients.models import Module
 from comptes.permissions import AbonnementValide, ModuleActif, permission
 from scolarite.models import AnneeScolaire, Classe, Inscription
+from scolarite.perimetre import classe_visible, filtrer
 
 from . import services
-from .models import Absence, Bulletin, Cours, Evaluation, Matiere, Note, Parametres, Periode, Surveillance
+from .models import (Absence, Bulletin, Cours, Creneau, Evaluation, Matiere, Note, Parametres, Periode, ProfilEnseignant,
+                     Surveillance)
 
 
 def _metier(fn):
@@ -31,6 +33,10 @@ def _metier(fn):
 
 class BaseNotes:
     module_requis = Module.NOTES
+
+
+# Comptes qui peuvent être titulaires d'un cours
+TYPES_ENSEIGNANTS = ("enseignant", "directeur", "surveillant")
 
 
 # --------------------------------------------------------------------------- #
@@ -113,7 +119,7 @@ class CoursSerializer(serializers.ModelSerializer):
         fields = ["id", "classe", "classe_nom", "matiere", "matiere_nom", "coefficient", "enseignant", "enseignant_nom"]
 
     def validate_enseignant(self, user):
-        if user and user.role not in ("enseignant", "directeur", "surveillant"):
+        if user and user.role not in TYPES_ENSEIGNANTS:
             raise serializers.ValidationError("Ce compte n'est pas un enseignant.")
         return user
 
@@ -124,9 +130,11 @@ class CoursViewSet(BaseNotes, viewsets.ModelViewSet):
     permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "scolarite.parametrer")]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = filtrer(super().get_queryset(), self.request.user)
         if classe := self.request.query_params.get("classe"):
             qs = qs.filter(classe=classe)
+        if enseignant := self.request.query_params.get("enseignant"):
+            qs = qs.filter(enseignant=enseignant)
         return qs
 
     @action(detail=False, methods=["get"], url_path="mes-cours",
@@ -153,7 +161,7 @@ class SurveillanceViewSet(BaseNotes, mixins.ListModelMixin, mixins.CreateModelMi
     permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "scolarite.parametrer")]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = filtrer(super().get_queryset(), self.request.user)
         if classe := self.request.query_params.get("classe"):
             qs = qs.filter(classe=classe)
         return qs
@@ -181,7 +189,7 @@ class EvaluationViewSet(BaseNotes, viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = filtrer(super().get_queryset(), self.request.user, "cours__classe")
         for p in ("cours", "periode"):
             if v := self.request.query_params.get(p):
                 qs = qs.filter(**{p: v})
@@ -318,7 +326,7 @@ class AbsenceViewSet(mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.Ge
     http_method_names = ["get", "patch", "head", "options"]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = filtrer(super().get_queryset(), self.request.user, "inscription__classe")
         for p in ("inscription", "date"):
             if v := self.request.query_params.get(p):
                 qs = qs.filter(**{p: v})
@@ -334,7 +342,7 @@ class ResultatsView(BaseNotes, APIView):
     permission_classes = [AbonnementValide, ModuleActif, permission("notes.voir")]
 
     def get(self, request):
-        classe = get_object_or_404(Classe, pk=request.query_params.get("classe"))
+        classe = get_object_or_404(filtrer(Classe.objects.all(), request.user, "id"), pk=request.query_params.get("classe"))
         periode = get_object_or_404(Periode, pk=request.query_params.get("periode"))
         return Response(services.resultats_classe(classe, periode))
 
@@ -363,7 +371,7 @@ class BulletinViewSet(BaseNotes, mixins.ListModelMixin, mixins.RetrieveModelMixi
     permission_classes = [AbonnementValide, ModuleActif, permission("notes.voir")]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = filtrer(super().get_queryset(), self.request.user, "inscription__classe")
         for p in ("periode", "inscription"):
             if v := self.request.query_params.get(p):
                 qs = qs.filter(**{p: v})

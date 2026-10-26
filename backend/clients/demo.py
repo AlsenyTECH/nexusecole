@@ -119,3 +119,72 @@ def remplir_pedagogie(ecole):
             Absence.objects.create(inscription=insc, date=jour, creneau="matin", type="absence" if k % 2 == 0 else "retard",
                                    saisie_par=surv)
         return True
+
+
+def remplir_familles(ecole):
+    """Parents, tuteur avec accès à l'application, fiches des enseignants, emploi du temps (idempotent)."""
+    from datetime import time
+
+    from pedagogie.models import Cours, Creneau, Evaluation, Matiere, Periode, ProfilEnseignant
+    from scolarite.models import LienResponsable, Responsable
+    from scolarite.services import creer_acces
+
+    with schema_context(ecole.schema_name):
+        annee = AnneeScolaire.objects.filter(active=True).first()
+        if not annee or Responsable.objects.exists() or not Matiere.objects.exists():
+            return False
+
+        # Un parent par élève (le père, avec le numéro déjà connu), la mère pour quelques-uns
+        for i, eleve in enumerate(Eleve.objects.order_by("matricule")):
+            pere = Responsable.objects.create(prenom=["Mamadou", "Ibrahima", "Cheikh", "Abdoulaye"][i % 4], nom=eleve.nom,
+                                              telephone=eleve.telephone_parent or f"77 000 00 {i:02d}", profession="Commerçant")
+            LienResponsable.objects.create(eleve=eleve, responsable=pere, lien="pere", contact_principal=True)
+            if i % 3 == 0:
+                mere = Responsable.objects.create(prenom=["Mame Diarra", "Astou", "Bineta"][i % 3], nom=eleve.nom,
+                                                  telephone=f"76 {200 + i} 45 {10 + i:02d}", profession="Enseignante")
+                LienResponsable.objects.create(eleve=eleve, responsable=mere, lien="mere")
+
+        # Compte de démo « parent » : la mère d'Aminata Ndiaye (6e A), aussi tutrice légale de Babacar Ndour (CM2 A)
+        aminata = Eleve.objects.filter(prenom="Aminata", nom="Ndiaye").first()
+        babacar = Eleve.objects.filter(prenom="Babacar", nom="Ndour").first()
+        if aminata:
+            maman = LienResponsable.objects.filter(eleve=aminata, lien="mere").first()
+            maman = maman.responsable if maman else Responsable.objects.create(prenom="Mame Diarra", nom="Ndiaye", telephone="76 200 45 10")
+            if not LienResponsable.objects.filter(eleve=aminata, responsable=maman).exists():
+                LienResponsable.objects.create(eleve=aminata, responsable=maman, lien="mere")
+            if babacar:
+                LienResponsable.objects.create(eleve=babacar, responsable=maman, lien="tuteur")
+            creer_acces(maman, "parent@lycee-demo.sn", "Demo-Nexus-2026")
+
+        # Fiches des enseignants
+        maths, francais = Matiere.objects.filter(nom="Mathématiques").first(), Matiere.objects.filter(nom="Français").first()
+        anglais = Matiere.objects.filter(nom="Anglais").first()
+        for email, statut, matiere, diplome in (("prof@lycee-demo.sn", "permanent", maths, "CAES de mathématiques"),
+                                                ("prof.francais@lycee-demo.sn", "permanent", francais, "CAES de lettres"),
+                                                ("prof.anglais@lycee-demo.sn", "vacataire", anglais, "Licence d'anglais")):
+            u = Utilisateur.objects.filter(email=email).first()
+            if u:
+                profil, _ = ProfilEnseignant.objects.get_or_create(utilisateur=u, defaults={"statut": statut, "diplome": diplome})
+                if matiere:
+                    profil.matieres.add(matiere)
+
+        # Emploi du temps : chaque cours, deux heures par semaine, sans chevauchement de classe ni d'enseignant
+        plages = [(time(8), time(10)), (time(10, 15), time(12, 15)), (time(15), time(17))]
+        occupe = set()
+        for classe in Classe.objects.filter(annee=annee).order_by("niveau", "nom"):
+            for k, cours in enumerate(Cours.objects.filter(classe=classe).order_by("-coefficient", "matiere__nom")):
+                for n in range(15):
+                    jour, (debut, fin) = (n + k * 2) % 5 + 1, plages[(n + k) % 3]
+                    cles = {("classe", classe.pk, jour, debut)} | ({("prof", cours.enseignant_id, jour, debut)} if cours.enseignant_id else set())
+                    if not cles & occupe:
+                        occupe |= cles
+                        Creneau.objects.create(cours=cours, jour=jour, debut=debut, fin=fin, salle=f"S{classe.pk}")
+                        break
+
+        # Une composition à venir en 6e A (visible dans l'espace famille)
+        cours = Cours.objects.filter(classe__nom="6e A", matiere=maths).first()
+        t1 = Periode.objects.filter(annee=annee, ordre=1).first()
+        if cours and t1:
+            Evaluation.objects.create(cours=cours, periode=t1, type="composition", titre="Composition du 1er trimestre",
+                                      date=timezone.localdate() + timedelta(days=10), sur=20, creee_par=cours.enseignant)
+        return True

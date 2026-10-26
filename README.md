@@ -86,6 +86,7 @@ Au premier lancement : base de données, plateforme, super-admin et école de d�
 | http://lycee-demo.localhost:5173 (école, caissier) | `caisse@lycee-demo.sn` / `Demo-Nexus-2026` |
 | http://lycee-demo.localhost:5173 (professeur de maths) | `prof@lycee-demo.sn` / `Demo-Nexus-2026` |
 | http://lycee-demo.localhost:5173 (surveillant 6e A, 5e A) | `surveillant@lycee-demo.sn` / `Demo-Nexus-2026` |
+| http://lycee-demo.localhost:5173 (espace famille : mère d'Aminata, tutrice de Babacar) | `parent@lycee-demo.sn` / `Demo-Nexus-2026` |
 
 L'école de démo est remplie automatiquement : année scolaire, 5 classes, grille des frais,
 16 élèves inscrits, quelques paiements, les matières et enseignants, 3 trimestres,
@@ -185,7 +186,10 @@ Paiement annuel (10 mois) : 2 mois offerts.
 - [x] **Phase 1a** : droits configurables, inscriptions, frais, échéances, paiements, reçus, impayés, caisse (API)
 - [x] **Phase 1b** : matières, cours, attributions, notes, moyennes et rangs, conseil de classe, bulletins signés (QR code), appel et absences
 - [x] **Phase 1c** : nouveau design inspiré d'AP2A Impact (écrans école et console)
-- [ ] **Phase 2 – Parents** : PWA parents, SMS/WhatsApp, paiement Wave / Orange Money
+- [x] **Phase 2a – Familles et équipe** : fiche élève complète, parents et tuteurs (plusieurs par élève, fratries),
+  espace famille (notes, évaluations prévues, emploi du temps, bulletins, absences, scolarité), enseignants
+  (fiche, classes et matières attribuées, vue limitée à leurs classes), emploi du temps, rôles personnalisés
+- [ ] **Phase 2b** : carte scolaire QR, porte-monnaie (Wave / Orange Money), comptes élèves, SMS/WhatsApp
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants
 

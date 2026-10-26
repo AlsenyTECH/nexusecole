@@ -87,6 +87,7 @@ const envoi = (methode: string) => <T = unknown>(chemin: string, corps?: unknown
 export const post = envoi("POST");
 export const patch = envoi("PATCH");
 export const supprimer = envoi("DELETE");
+export const remplacer = envoi("PUT");
 
 export async function seConnecter(email: string, password: string) {
   sauver(null);

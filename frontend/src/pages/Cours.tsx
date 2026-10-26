@@ -26,11 +26,16 @@ export function Cours() {
   const { data: classes = [] } = useClasses(annee?.id);
   const [classe, setClasse] = useState<number | null>(null);
   useEffect(() => { if (!classe && classes.length) setClasse(classes[0].id); }, [classes, classe]);
-  // La liste du personnel sert aux choix d'enseignants ; réservée à qui gère les comptes.
+  // Personnel et enseignants servent aux choix de titulaires ; réservés à qui gère les comptes.
   const { data: personnel = [] } = useQuery({
-    queryKey: ["personnel"],
+    queryKey: ["personnel", "et-enseignants"],
     enabled: peut("utilisateurs.gerer"),
-    queryFn: async () => (await api<Page<Personnel>>("/api/personnel")).results.filter((p) => p.is_active),
+    queryFn: async () => {
+      const [equipe, profs] = await Promise.all([
+        api<Page<Personnel>>("/api/personnel?page_size=500"), api<Page<Personnel>>("/api/enseignants?page_size=500"),
+      ]);
+      return [...profs.results, ...equipe.results].filter((p) => p.is_active);
+    },
   });
 
   return (

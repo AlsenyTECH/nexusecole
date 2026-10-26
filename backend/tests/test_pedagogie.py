@@ -51,7 +51,7 @@ class SaisieTests(BasePedagogie):
         self.assertEqual(self.noter(self.prof2_c, ev, {self.i1: {"valeur": 20}}).status_code, 403)  # autre matière
         self.assertEqual(self.noter(self.surv_c, ev, {self.i2: {"valeur": 9}}).status_code, 200)  # affecté à la 6e A
         surv2 = self.auth(HOTE_A, "surv2@a.sn")
-        self.assertEqual(self.noter(surv2, ev, {self.i2: {"valeur": 9}}).status_code, 403)  # pas affecté
+        self.assertEqual(self.noter(surv2, ev, {self.i2: {"valeur": 9}}).status_code, 404)  # pas affecté : ne la voit pas
         self.assertEqual(self.noter(self.caisse, ev, {self.i2: {"valeur": 9}}).status_code, 403)  # pas de droit notes
         r = self.prof2_c.post("/api/evaluations", {"cours": self.maths.pk, "periode": self.t1.pk, "titre": "x",
                                                     "date": str(timezone.localdate())}, format="json")

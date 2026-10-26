@@ -32,10 +32,13 @@ class Command(BaseCommand):
             self.stdout.write("  Données de démonstration ajoutées (élèves, frais, paiements).")
         if demo.remplir_pedagogie(ecole_demo):
             self.stdout.write("  Pédagogie de démonstration ajoutée (matières, enseignants, notes, absences).")
+        if demo.remplir_familles(ecole_demo):
+            self.stdout.write("  Familles de démonstration ajoutées (parents, tuteur, emploi du temps).")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
             "\n  Caisse  : caisse@lycee-demo.sn / Demo-Nexus-2026"
             "\n  Prof    : prof@lycee-demo.sn / Demo-Nexus-2026 (mathématiques)"
-            "\n  Surveillant : surveillant@lycee-demo.sn / Demo-Nexus-2026 (6e A, 5e A)\n"
+            "\n  Surveillant : surveillant@lycee-demo.sn / Demo-Nexus-2026 (6e A, 5e A)"
+            "\n  Parent  : parent@lycee-demo.sn / Demo-Nexus-2026 (mère d'Aminata, tutrice de Babacar)\n"
         ))

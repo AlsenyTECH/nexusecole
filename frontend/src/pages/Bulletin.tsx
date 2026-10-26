@@ -11,9 +11,12 @@ import { note, rang } from "@/lib/requetes";
 import type { Bulletin as TBulletin } from "@/lib/types";
 
 /** Bulletin imprimable (A4), avec QR code de vérification publique. Toujours en clair. */
-export function Bulletin() {
+export function Bulletin({ famille = false }: { famille?: boolean }) {
   const { id } = useParams();
-  const { data: b, isError } = useQuery({ queryKey: ["bulletin", id], queryFn: () => api<TBulletin>(`/api/bulletins/${id}`) });
+  const { data: b, isError } = useQuery({
+    queryKey: ["bulletin", id],
+    queryFn: () => api<TBulletin>(famille ? `/api/famille/bulletins/${id}` : `/api/bulletins/${id}`),
+  });
   const [qr, setQr] = useState("");
   const lien = b ? `${location.origin}${espace.base}/verifier/${b.code}` : "";
   useEffect(() => { if (lien) QRCode.toDataURL(lien, { margin: 1, width: 220 }).then(setQr); }, [lien]);

@@ -1,21 +1,23 @@
-import { useState, type FormEvent } from "react";
+import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Banknote, Ban, ReceiptText } from "lucide-react";
+import { ArrowLeft, Banknote, Ban, HeartPulse, Pencil, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, Champ, Choix, Indicateur, Liste, Pastille, Section } from "@/components/design";
 import { Encaissement } from "@/components/Encaissement";
+import { ResponsablesEleve } from "@/components/Responsables";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ouvrirDocument } from "@/lib/utils";
-import { api, messageErreur, post, type Page } from "@/lib/api";
+import { api, messageErreur, patch, post, type Page } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { date, dateHeure, fcfa, MOYENS } from "@/lib/format";
 import { useAnneeActive, useClasses, useRafraichir } from "@/lib/requetes";
-import type { Eleve, Inscription, Paiement, Situation } from "@/lib/types";
+import type { Config, Eleve, Inscription, Paiement, Situation } from "@/lib/types";
 
 export function EleveDetail() {
   const { id } = useParams();
@@ -28,6 +30,8 @@ export function EleveDetail() {
   });
   const courante = inscriptions?.find((i) => i.annee === annee?.id) ?? inscriptions?.[0];
   const [encaisser, setEncaisser] = useState(false);
+  const [edition, setEdition] = useState(false);
+  const { data: config } = useQuery({ queryKey: ["config"], queryFn: () => api<Config>("/api/ecole/config") });
 
   if (!eleve) return <p className="text-muted-foreground">Chargement…</p>;
   return (
@@ -40,11 +44,14 @@ export function EleveDetail() {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>{eleve.matricule}</span>
             {eleve.date_naissance ? <span>· né{eleve.sexe === "F" ? "e" : ""} le {date(eleve.date_naissance)}</span> : null}
-            {eleve.telephone_parent ? <span>· parent : {eleve.telephone_parent}</span> : null}
+            {eleve.lieu_naissance ? <span>à {eleve.lieu_naissance}</span> : null}
+            {eleve.telephone_contact ? <span>· contact : {eleve.telephone_contact}</span> : null}
           </div>
         </div>
+        {peut("eleves.gerer") ? <Button variant="secondary" onClick={() => setEdition(true)}><Pencil /> Modifier la fiche</Button> : null}
         {courante && peut("frais.encaisser") ? <Button onClick={() => setEncaisser(true)}><Banknote /> Encaisser</Button> : null}
       </div>
+      <FicheEleve eleve={eleve} />
 
       {courante ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/80 bg-card p-4 shadow-carte">
@@ -58,8 +65,10 @@ export function EleveDetail() {
         <Inscrire eleve={eleve} />
       ) : null}
 
+      <ResponsablesEleve eleve={eleve} espaceParents={!!config?.modules.includes("parents")} />
       {courante && peut("frais.voir") ? <Finances inscription={courante.id} /> : null}
       <Encaissement inscription={courante?.id ?? null} ouvert={encaisser} fermer={() => setEncaisser(false)} />
+      <ModifierEleve eleve={edition ? eleve : null} fermer={() => setEdition(false)} />
     </div>
   );
 }
@@ -199,6 +208,78 @@ export function Annulation({ paiement, fermer }: { paiement: Paiement | null; fe
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={fermer}>Retour</Button>
             <Button type="submit" variant="destructive" disabled={envoi}>Annuler le paiement</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Informations de la fiche (n'affiche que ce qui est renseigné). */
+function FicheEleve({ eleve }: { eleve: Eleve }) {
+  const lignes: [string, string][] = ([
+    ["Nationalité", eleve.nationalite], ["Adresse", eleve.adresse], ["Arrivée dans l'école", eleve.date_entree ? date(eleve.date_entree) : ""],
+    ["Établissement précédent", eleve.ancien_etablissement],
+  ] as [string, string][]).filter(([, v]) => v);
+  if (!lignes.length && !eleve.informations_medicales) return null;
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {lignes.length ? (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-xl border border-border/80 bg-card p-4 text-sm shadow-carte">
+          {lignes.map(([l, v]) => <Fragment key={l}><dt className="text-muted-foreground">{l}</dt><dd>{v}</dd></Fragment>)}
+        </dl>
+      ) : null}
+      {eleve.informations_medicales ? (
+        <div className="flex gap-3 rounded-xl border border-[#f2c7d6] bg-[#fbe8ef] p-4 text-sm text-[#7a2244]">
+          <HeartPulse className="size-5 shrink-0" />
+          <div><div className="font-semibold">Santé</div><p className="whitespace-pre-line">{eleve.informations_medicales}</p></div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ModifierEleve({ eleve, fermer }: { eleve: Eleve | null; fermer: () => void }) {
+  const rafraichir = useRafraichir();
+  const vide = { prenom: "", nom: "", sexe: "F", matricule: "", date_naissance: "", lieu_naissance: "", nationalite: "", adresse: "",
+    ancien_etablissement: "", date_entree: "", informations_medicales: "" };
+  const [f, setF] = useState(vide);
+  useEffect(() => {
+    if (eleve) setF({ prenom: eleve.prenom, nom: eleve.nom, sexe: eleve.sexe, matricule: eleve.matricule, date_naissance: eleve.date_naissance ?? "",
+      lieu_naissance: eleve.lieu_naissance, nationalite: eleve.nationalite, adresse: eleve.adresse, ancien_etablissement: eleve.ancien_etablissement,
+      date_entree: eleve.date_entree ?? "", informations_medicales: eleve.informations_medicales });
+  }, [eleve]);
+  const champ = (k: keyof typeof vide) => ({ value: f[k], onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
+  async function valider(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await patch(`/api/eleves/${eleve!.id}`, { ...f, date_naissance: f.date_naissance || null, date_entree: f.date_entree || null });
+      toast.success("Fiche mise à jour");
+      rafraichir("eleves");
+      fermer();
+    } catch (err) {
+      toast.error(messageErreur(err));
+    }
+  }
+  return (
+    <Dialog open={!!eleve} onOpenChange={(o) => !o && fermer()}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>Fiche de {eleve?.prenom} {eleve?.nom}</DialogTitle></DialogHeader>
+        <form onSubmit={valider} className="grid gap-4 sm:grid-cols-2">
+          <Champ label="Prénom"><Input required {...champ("prenom")} /></Champ>
+          <Champ label="Nom"><Input required {...champ("nom")} /></Champ>
+          <Champ label="Sexe"><Choix {...champ("sexe")}><option value="F">Fille</option><option value="M">Garçon</option></Choix></Champ>
+          <Champ label="Matricule"><Input required {...champ("matricule")} /></Champ>
+          <Champ label="Date de naissance"><Input type="date" {...champ("date_naissance")} /></Champ>
+          <Champ label="Lieu de naissance"><Input {...champ("lieu_naissance")} /></Champ>
+          <Champ label="Nationalité"><Input {...champ("nationalite")} /></Champ>
+          <Champ label="Adresse"><Input {...champ("adresse")} /></Champ>
+          <Champ label="Date d'arrivée dans l'école"><Input type="date" {...champ("date_entree")} /></Champ>
+          <Champ label="Établissement précédent"><Input {...champ("ancien_etablissement")} /></Champ>
+          <Champ label="Informations médicales" className="sm:col-span-2"><Textarea rows={2} {...champ("informations_medicales")} /></Champ>
+          <DialogFooter className="sm:col-span-2">
+            <Button type="button" variant="secondary" onClick={fermer}>Annuler</Button>
+            <Button type="submit">Enregistrer</Button>
           </DialogFooter>
         </form>
       </DialogContent>

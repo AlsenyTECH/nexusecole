@@ -191,3 +191,41 @@ class Bulletin(models.Model):
 
     class Meta:
         unique_together = [("inscription", "periode")]
+
+
+class ProfilEnseignant(models.Model):
+    """Informations propres à un enseignant (son compte reste un Utilisateur de type « enseignant »)."""
+
+    class Statut(models.TextChoices):
+        PERMANENT = "permanent", "Permanent"
+        VACATAIRE = "vacataire", "Vacataire"
+        STAGIAIRE = "stagiaire", "Stagiaire"
+
+    utilisateur = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profil_enseignant")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.PERMANENT)
+    matieres = models.ManyToManyField(Matiere, blank=True, related_name="enseignants",
+                                      help_text="Matières qu'il peut enseigner")
+    diplome = models.CharField(max_length=120, blank=True)
+    date_arrivee = models.DateField(null=True, blank=True)
+
+
+class Creneau(models.Model):
+    """Une heure de cours dans l'emploi du temps hebdomadaire d'une classe."""
+
+    class Jour(models.IntegerChoices):
+        LUNDI = 1, "Lundi"
+        MARDI = 2, "Mardi"
+        MERCREDI = 3, "Mercredi"
+        JEUDI = 4, "Jeudi"
+        VENDREDI = 5, "Vendredi"
+        SAMEDI = 6, "Samedi"
+
+    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name="creneaux")
+    jour = models.PositiveSmallIntegerField(choices=Jour.choices)
+    debut = models.TimeField()
+    fin = models.TimeField()
+    salle = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        ordering = ["jour", "debut"]
+        constraints = [models.CheckConstraint(condition=models.Q(fin__gt=models.F("debut")), name="creneau_fin_apres_debut")]
