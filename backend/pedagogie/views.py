@@ -348,9 +348,14 @@ class ResultatsView(BaseNotes, APIView):
 
 
 class ConseilView(BaseNotes, APIView):
-    """Tenir le conseil de classe : verrouille la période et émet les bulletins signés."""
+    """Tenir le conseil de classe : verrouille la période et émet les bulletins signés. GET : historique."""
 
-    permission_classes = [AbonnementValide, ModuleActif, permission("notes.valider")]
+    permission_classes = [AbonnementValide, ModuleActif, permission("notes.voir", "notes.valider")]
+
+    def get(self, request):
+        classe = get_object_or_404(filtrer(Classe.objects.all(), request.user, "id"), pk=request.query_params.get("classe"))
+        periode = get_object_or_404(Periode, pk=request.query_params.get("periode"))
+        return Response(services.historique_conseils(classe, periode))
 
     def post(self, request):
         classe = get_object_or_404(Classe, pk=request.data.get("classe"))
@@ -359,10 +364,22 @@ class ConseilView(BaseNotes, APIView):
         return Response({"bulletins": n}, status=status.HTTP_201_CREATED)
 
 
+class ReouvertureView(BaseNotes, APIView):
+    """Rouvrir un conseil tenu : {classe, periode, motif}. Les bulletins émis sont annulés, pas effacés."""
+
+    permission_classes = [AbonnementValide, ModuleActif, permission("conseils.rouvrir")]
+
+    def post(self, request):
+        classe = get_object_or_404(Classe, pk=request.data.get("classe"))
+        periode = get_object_or_404(Periode, pk=request.data.get("periode"))
+        n = _metier(lambda: services.rouvrir_conseil(classe, periode, request.user, request.data.get("motif")))
+        return Response({"bulletins_annules": n})
+
+
 class BulletinSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bulletin
-        fields = ["id", "inscription", "periode", "contenu", "empreinte", "code", "emis_le"]
+        fields = ["id", "inscription", "periode", "contenu", "empreinte", "code", "emis_le", "annule_le", "motif_annulation"]
 
 
 class BulletinViewSet(BaseNotes, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -372,6 +389,8 @@ class BulletinViewSet(BaseNotes, mixins.ListModelMixin, mixins.RetrieveModelMixi
 
     def get_queryset(self):
         qs = filtrer(super().get_queryset(), self.request.user, "inscription__classe")
+        if self.action == "list" and self.request.query_params.get("annules") != "1":
+            qs = qs.filter(annule_le__isnull=True)  # par défaut : les bulletins en vigueur
         for p in ("periode", "inscription"):
             if v := self.request.query_params.get(p):
                 qs = qs.filter(**{p: v})
@@ -394,6 +413,9 @@ class VerificationView(APIView):
         c = b.contenu
         return Response({
             "authentique": services.signature_valide(b),
+            # Annulé après réouverture du conseil : authentique (bien émis par l'école) mais plus en vigueur.
+            # Le motif reste interne à l'école.
+            "en_vigueur": b.annule_le is None, "annule_le": b.annule_le, "remplace": b.remplace_par_id is not None,
             "ecole": c["ecole"], "eleve": c["eleve"], "classe": c["classe"], "periode": c["periode"], "annee": c["annee"],
             "moyenne": c["moyenne"], "bareme": c["bareme"], "rang": c["rang"], "effectif": c["effectif"],
             "mention": c["mention"], "emis_le": b.emis_le, "empreinte": b.empreinte,

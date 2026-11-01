@@ -87,15 +87,24 @@ class Surveillance(models.Model):
 
 
 class Conseil(models.Model):
-    """Conseil de classe d'une période : une fois verrouillé, plus aucune note ne change."""
+    """
+    Conseil de classe d'une période : tant qu'il n'est pas rouvert, plus aucune note ne change.
+    Une réouverture (droit dédié, motif obligatoire) est conservée : l'historique des conseils
+    d'une classe ne se perd jamais.
+    """
 
     classe = models.ForeignKey(Classe, on_delete=models.CASCADE, related_name="conseils")
     periode = models.ForeignKey(Periode, on_delete=models.PROTECT, related_name="conseils")
     verrouille_le = models.DateTimeField(auto_now_add=True)
     verrouille_par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    rouvert_le = models.DateTimeField(null=True, blank=True)
+    rouvert_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    motif_reouverture = models.CharField(max_length=300, blank=True)
 
     class Meta:
-        unique_together = [("classe", "periode")]
+        ordering = ["verrouille_le"]
+        constraints = [models.UniqueConstraint(fields=["classe", "periode"], condition=models.Q(rouvert_le__isnull=True),
+                                               name="un_seul_conseil_en_vigueur")]
 
 
 class Evaluation(models.Model):
@@ -188,9 +197,15 @@ class Bulletin(models.Model):
     signature = models.CharField(max_length=128)
     code = models.CharField(max_length=16, unique=True, help_text="Code de vérification (dans le QR code)")
     emis_le = models.DateTimeField(auto_now_add=True)
+    # Révocation (réouverture du conseil) : le bulletin reste, signé, mais marqué annulé.
+    # Le statut n'est pas dans le contenu signé : la signature prouve l'origine, la base dit s'il est en vigueur.
+    annule_le = models.DateTimeField(null=True, blank=True)
+    motif_annulation = models.CharField(max_length=300, blank=True)
+    remplace_par = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="remplace")
 
     class Meta:
-        unique_together = [("inscription", "periode")]
+        constraints = [models.UniqueConstraint(fields=["inscription", "periode"], condition=models.Q(annule_le__isnull=True),
+                                               name="un_seul_bulletin_en_vigueur")]
 
 
 class ProfilEnseignant(models.Model):

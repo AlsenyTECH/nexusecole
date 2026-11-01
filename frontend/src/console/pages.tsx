@@ -13,7 +13,11 @@ import { date, fcfa } from "@/lib/format";
 import { useRafraichir } from "@/lib/requetes";
 import { adresseEcole, espace } from "@/lib/ecole";
 
-type Ecole = { id: number; nom: string; domaine: string; statut: string; forfait: string | null; ville: string; fin_essai: string | null; couleur_primaire: string };
+const PAYS: Record<string, string> = {
+  SN: "Sénégal", ML: "Mali", GN: "Guinée", GM: "Gambie", MR: "Mauritanie", GW: "Guinée-Bissau",
+  CI: "Côte d'Ivoire", BF: "Burkina Faso", NE: "Niger", TG: "Togo", BJ: "Bénin",
+};
+type Ecole = { id: number; nom: string; domaine: string; statut: string; forfait: string | null; ville: string; pays: string; fin_essai: string | null; couleur_primaire: string };
 type Forfait = { code: string; nom: string; prix_mensuel: number; max_eleves: number | null };
 type Facture = { id: number; numero: string; ecole_nom: string; montant: number; echeance: string; statut: string; moyen_paiement: string };
 type Stats = { ecoles_total: number; ecoles_par_statut: Record<string, number>; revenu_mensuel_recurrent: number; factures_impayees: number };
@@ -45,7 +49,7 @@ export function AccueilConsole() {
             {ecoles.slice(0, 6).map((e) => (
               <div key={e.id} className="flex items-center gap-3 px-4 py-3">
                 <span className="size-3 shrink-0 rounded-full" style={{ background: e.couleur_primaire }} />
-                <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.nom}</div><div className="text-xs text-muted-foreground">{e.ville} · {e.forfait ?? "sans forfait"}</div></div>
+                <div className="min-w-0 flex-1"><div className="truncate font-medium">{e.nom}</div><div className="text-xs text-muted-foreground">{[e.ville, PAYS[e.pays]].filter(Boolean).join(", ")} · {e.forfait ?? "sans forfait"}</div></div>
                 <Statut s={e.statut} />
               </div>
             ))}
@@ -103,7 +107,7 @@ export function Ecoles() {
 function NouvelleEcole({ ouvert, fermer }: { ouvert: boolean; fermer: () => void }) {
   const rafraichir = useRafraichir();
   const { data: forfaits = [] } = useQuery({ queryKey: ["forfaits"], queryFn: async () => (await api<Page<Forfait>>("/api/admin/forfaits")).results });
-  const vide = { nom: "", sous_domaine: "", ville: "", forfait: "starter", couleur_primaire: "#0f766e", couleur_secondaire: "#f59e0b", prenom: "", nom_directeur: "", email: "", mot_de_passe: "" };
+  const vide = { nom: "", sous_domaine: "", ville: "", pays: "SN", forfait: "starter", couleur_primaire: "#0f766e", couleur_secondaire: "#f59e0b", prenom: "", nom_directeur: "", email: "", mot_de_passe: "" };
   const [f, setF] = useState(vide);
   const [envoi, setEnvoi] = useState(false);
   const champ = (k: keyof typeof vide) => ({ value: f[k], onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
@@ -112,7 +116,7 @@ function NouvelleEcole({ ouvert, fermer }: { ouvert: boolean; fermer: () => void
     setEnvoi(true);
     try {
       await post("/api/admin/ecoles", {
-        nom: f.nom, sous_domaine: f.sous_domaine, ville: f.ville, forfait: f.forfait,
+        nom: f.nom, sous_domaine: f.sous_domaine, ville: f.ville, pays: f.pays, forfait: f.forfait,
         couleur_primaire: f.couleur_primaire, couleur_secondaire: f.couleur_secondaire,
         directeur: { prenom: f.prenom, nom: f.nom_directeur, email: f.email, mot_de_passe: f.mot_de_passe },
       });
@@ -139,7 +143,10 @@ function NouvelleEcole({ ouvert, fermer }: { ouvert: boolean; fermer: () => void
             <Input required pattern="[a-z0-9-]{3,40}" {...champ("sous_domaine")} />
           </Champ>
           <Champ label="Ville"><Input {...champ("ville")} /></Champ>
-          <Champ label="Forfait" className="sm:col-span-2">
+          <Champ label="Pays" aide="Fixe la monnaie, l'indicatif téléphonique et le fuseau horaire de l'école.">
+            <Choix {...champ("pays")}>{Object.entries(PAYS).map(([code, nom]) => <option key={code} value={code}>{nom}</option>)}</Choix>
+          </Champ>
+          <Champ label="Forfait">
             <Choix {...champ("forfait")}>{forfaits.map((fo) => <option key={fo.code} value={fo.code}>{fo.nom} · {fcfa(fo.prix_mensuel)}/mois{fo.max_eleves ? ` · ${fo.max_eleves} élèves` : ""}</option>)}</Choix>
           </Champ>
           <Champ label="Couleur principale"><Input type="color" className="h-10 p-1" {...champ("couleur_primaire")} /></Champ>

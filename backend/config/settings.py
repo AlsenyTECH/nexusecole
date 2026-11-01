@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "config.tls.AutorisationTLSMiddleware",
     # Résout l'école (sous-domaine, ou en-tête X-Ecole en mode « chemin ») → schéma PostgreSQL
     "config.ecole_middleware.EcoleMiddleware",
+    "config.ecole_middleware.FuseauEcoleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",

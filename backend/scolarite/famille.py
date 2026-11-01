@@ -119,7 +119,7 @@ class EnfantRubriqueView(BaseFamille):
         return [{"id": b.pk, "periode": b.contenu["periode"], "annee": b.contenu["annee"], "classe": b.contenu["classe"],
                  "moyenne": b.contenu["moyenne"], "bareme": b.contenu["bareme"], "rang": b.contenu["rang"],
                  "effectif": b.contenu["effectif"], "mention": b.contenu["mention"], "emis_le": b.emis_le}
-                for b in Bulletin.objects.filter(inscription__eleve=insc.eleve).order_by("-emis_le")]
+                for b in Bulletin.objects.filter(inscription__eleve=insc.eleve, annule_le__isnull=True).order_by("-emis_le")]
 
     def emploi_du_temps(self, insc):
         from pedagogie.equipe import CreneauSerializer
@@ -156,7 +156,7 @@ class BulletinFamilleView(BaseFamille):
         from pedagogie.models import Bulletin
         from pedagogie.views import BulletinSerializer
 
-        b = get_object_or_404(Bulletin, pk=pk, inscription__eleve__in=eleves_suivis(request.user))
+        b = get_object_or_404(Bulletin, pk=pk, inscription__eleve__in=eleves_suivis(request.user), annule_le__isnull=True)
         return Response(BulletinSerializer(b).data)
 
 

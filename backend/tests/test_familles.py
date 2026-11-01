@@ -275,3 +275,22 @@ class EmploiDuTempsTests(BaseFamilles):
         self.assertEqual([c["classe_nom"] for c in planning], ["6e A", "5e A"])
         r = prof.post("/api/creneaux", {"cours": self.maths6.pk, "jour": 3, "debut": "08:00", "fin": "09:00"}, format="json")
         self.assertEqual(r.status_code, 403)  # construire l'emploi du temps est un droit à part
+
+
+class PaysTests(BaseFinances):
+    def test_monnaie_indicatif_et_fuseau_suivent_le_pays(self):
+        c = self.client_pour(HOTE_A).get("/api/ecole/config").json()
+        self.assertEqual((c["pays"], c["devise"], c["indicatif"]), ("SN", "FCFA", "221"))  # par défaut
+        Ecole.objects.filter(pk=self.ecole_a.pk).update(pays="GN")
+        c = self.client_pour(HOTE_A).get("/api/ecole/config").json()
+        self.assertEqual((c["devise"], c["indicatif"], c["chiffres_telephone"]), ("GNF", "224", 9))
+        Ecole.objects.filter(pk=self.ecole_a.pk).update(pays="NE")  # Niger : UTC+1
+        from unittest import mock
+
+        from django.utils import timezone
+        vu = {}
+        reel = timezone.get_current_timezone_name
+        with mock.patch("scolarite.views.AnneeScolaire.objects") as annees:
+            annees.filter.return_value.first.side_effect = lambda: vu.setdefault("fuseau", reel()) and None
+            self.dir.get("/api/tableau-de-bord")
+        self.assertEqual(vu["fuseau"], "Africa/Niamey")

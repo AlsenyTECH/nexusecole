@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from comptes.views import ConnexionView, MoiView, PersonnelViewSet, RafraichissementView, RoleViewSet
 from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, ConseilView, CoursViewSet,
                              EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
-                             ResultatsView, SurveillanceViewSet, VerificationView)
+                             ReouvertureView, ResultatsView, SurveillanceViewSet, VerificationView)
 from pedagogie.equipe import CreneauViewSet, EnseignantViewSet
 from scolarite.famille import BulletinFamilleView, EnfantRubriqueView, EnfantsView, RecuFamilleView
 from finances.views import CaisseView, FraisViewSet, ImpayesView, PaiementViewSet, SituationView
@@ -49,6 +49,7 @@ urlpatterns = [
     path("api/appel", AppelView.as_view()),
     path("api/resultats", ResultatsView.as_view()),
     path("api/conseils", ConseilView.as_view()),
+    path("api/conseils/rouvrir", ReouvertureView.as_view()),
     path("api/verifier/<str:code>", VerificationView.as_view()),
     path("api/famille/enfants", EnfantsView.as_view()),
     path("api/famille/enfants/<int:pk>/<slug:rubrique>", EnfantRubriqueView.as_view()),

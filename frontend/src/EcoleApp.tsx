@@ -7,7 +7,7 @@ import { Layout, type Groupe } from "@/components/Layout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { appliquerCouleurs } from "@/lib/couleurs";
-import { ROLES } from "@/lib/format";
+import { definirPays, ROLES } from "@/lib/format";
 import type { Config } from "@/lib/types";
 import { FamilleApp } from "@/famille/FamilleApp";
 import { Accueil } from "@/pages/Accueil";
@@ -48,6 +48,8 @@ export function EcoleApp() {
   // Vérification d'un bulletin par QR code : publique, sans connexion.
   if (pathname.startsWith("/verifier/")) return <Routes><Route path="/verifier/:code" element={<Verification />} /></Routes>;
   if (isError) return <div className="grid min-h-dvh place-items-center p-6 text-center text-muted-foreground">Établissement introuvable.</div>;
+  // Monnaie et indicatif du pays : fixés avant le premier affichage des montants
+  if (config) definirPays(config);
   if (!config || chargement) return <div className="grid min-h-dvh place-items-center text-muted-foreground">Chargement…</div>;
 
   if (!moi) {

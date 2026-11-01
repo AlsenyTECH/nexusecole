@@ -59,7 +59,7 @@ def cours_saisissables(user, annee):
 
 
 def est_verrouille(classe, periode):
-    return Conseil.objects.filter(classe=classe, periode=periode).exists()
+    return Conseil.objects.filter(classe=classe, periode=periode, rouvert_le__isnull=True).exists()
 
 
 # --------------------------------------------------------------------------- #
@@ -302,4 +302,33 @@ def tenir_conseil(classe, periode, par, ecole_nom):
             code=secrets.token_urlsafe(9)[:12],
         ))
     Bulletin.objects.bulk_create(emis)
+    # Après une réouverture : chaque ancien bulletin annulé pointe vers sa version corrigée
+    for b in emis:
+        Bulletin.objects.filter(inscription_id=b.inscription_id, periode=periode, annule_le__isnull=False,
+                                remplace_par__isnull=True).update(remplace_par=b)
     return len(emis)
+
+
+@transaction.atomic
+def rouvrir_conseil(classe, periode, par, motif):
+    """
+    Rouvre la période pour la classe : les notes redeviennent modifiables et les bulletins émis
+    sont annulés (révoqués), jamais effacés. Le prochain conseil émettra des versions corrigées.
+    """
+    motif = (motif or "").strip()
+    if len(motif) < 10:
+        raise ValidationError("Indiquez le motif de la réouverture (10 caractères minimum).")
+    conseil = Conseil.objects.select_for_update().filter(classe=classe, periode=periode, rouvert_le__isnull=True).first()
+    if conseil is None:
+        raise ValidationError("Aucun conseil de classe en vigueur pour cette période.")
+    maintenant = timezone.now()
+    conseil.rouvert_le, conseil.rouvert_par, conseil.motif_reouverture = maintenant, par, motif
+    conseil.save(update_fields=["rouvert_le", "rouvert_par", "motif_reouverture"])
+    return Bulletin.objects.filter(inscription__classe=classe, periode=periode, annule_le__isnull=True).update(
+        annule_le=maintenant, motif_annulation=motif)
+
+
+def historique_conseils(classe, periode):
+    return [{"tenu_le": c.verrouille_le, "tenu_par": c.verrouille_par.nom_complet, "rouvert_le": c.rouvert_le,
+             "rouvert_par": c.rouvert_par.nom_complet if c.rouvert_par else None, "motif": c.motif_reouverture}
+            for c in Conseil.objects.filter(classe=classe, periode=periode).select_related("verrouille_par", "rouvert_par")]

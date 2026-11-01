@@ -157,6 +157,39 @@ class ConseilEtBulletinsTests(BasePedagogie):
         self.assertTrue(public["authentique"])
         self.assertEqual(public["eleve"], "Fatou Sow (A-100)")
 
+    def test_reouverture_du_conseil(self):
+        ev = self.preparer()
+        lieu = {"classe": self.sixieme.pk, "periode": self.t1.pk}
+        self.dir.post("/api/conseils", lieu, format="json")
+        ancien = self.dir.get(f"/api/bulletins?inscription={self.i1}").json()["results"][0]
+
+        # Droit dédié (ni l'enseignant ni qui valide les notes) et motif obligatoire
+        self.assertEqual(self.prof_c.post("/api/conseils/rouvrir", {**lieu, "motif": "Erreur de saisie en maths"},
+                                          format="json").status_code, 403)
+        self.assertEqual(self.dir.post("/api/conseils/rouvrir", {**lieu, "motif": "oups"}, format="json").status_code, 400)
+        r = self.dir.post("/api/conseils/rouvrir", {**lieu, "motif": "Erreur de saisie en mathématiques"}, format="json")
+        self.assertEqual(r.json()["bulletins_annules"], 3)
+        self.assertEqual(self.dir.post("/api/conseils/rouvrir", {**lieu, "motif": "Encore une fois svp"},
+                                       format="json").status_code, 400)  # plus rien à rouvrir
+
+        # Les notes redeviennent modifiables ; l'ancien bulletin n'est plus en vigueur mais reste authentique
+        self.assertEqual(self.noter(self.prof_c, ev, {self.i1: {"valeur": 17}}).status_code, 200)
+        self.assertEqual(self.dir.get(f"/api/bulletins?inscription={self.i1}").json()["count"], 0)
+        public = self.client_pour(HOTE_A).get(f"/api/verifier/{ancien['code']}").json()
+        self.assertEqual((public["authentique"], public["en_vigueur"], public["remplace"]), (True, False, False))
+        self.assertNotIn("motif", str(public))  # le motif reste interne
+
+        # Nouveau conseil : version corrigée, l'ancienne pointe vers elle
+        self.dir.post("/api/conseils", lieu, format="json")
+        nouveau = self.dir.get(f"/api/bulletins?inscription={self.i1}").json()["results"][0]
+        self.assertEqual(nouveau["contenu"]["moyenne"], 17)
+        self.assertNotEqual(nouveau["code"], ancien["code"])
+        self.assertTrue(self.client_pour(HOTE_A).get(f"/api/verifier/{ancien['code']}").json()["remplace"])
+        self.assertTrue(self.client_pour(HOTE_A).get(f"/api/verifier/{nouveau['code']}").json()["en_vigueur"])
+        self.assertEqual(self.dir.get(f"/api/bulletins?inscription={self.i1}&annules=1").json()["count"], 2)
+        historique = self.dir.get(f"/api/conseils?classe={self.sixieme.pk}&periode={self.t1.pk}").json()
+        self.assertEqual([h["motif"] for h in historique], ["Erreur de saisie en mathématiques", ""])
+
     def test_bulletin_falsifie_detecte(self):
         self.preparer()
         self.dir.post("/api/conseils", {"classe": self.sixieme.pk, "periode": self.t1.pk}, format="json")

@@ -34,6 +34,10 @@ class ConfigEcoleView(APIView):
         return Response({
             "nom": ecole.nom,
             "ville": ecole.ville,
+            "pays": ecole.pays,
+            "indicatif": ecole.infos_pays.indicatif,
+            "chiffres_telephone": ecole.infos_pays.chiffres,
+            "devise": ecole.infos_pays.symbole,
             "logo_url": ecole.logo_url,
             "couleur_primaire": ecole.couleur_primaire,
             "couleur_secondaire": ecole.couleur_secondaire,

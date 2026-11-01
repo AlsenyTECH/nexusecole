@@ -3,6 +3,8 @@ from django.db import models
 from django.utils import timezone
 from django_tenants.models import DomainMixin, TenantMixin
 
+from .pays import CHOIX_PAYS, PAYS
+
 
 class Module(models.TextChoices):
     SCOLARITE = "scolarite", "Élèves & classes"
@@ -55,6 +57,8 @@ class Ecole(TenantMixin):
     nom = models.CharField(max_length=150)
     type_etablissement = models.CharField(max_length=30, choices=Type.choices, default=Type.PRIVE_LAIC)
     ville = models.CharField(max_length=80, blank=True)
+    pays = models.CharField(max_length=2, choices=CHOIX_PAYS, default="SN",
+                            help_text="Fixe l'indicatif téléphonique, la monnaie et le fuseau horaire")
     telephone = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
 
@@ -85,6 +89,10 @@ class Ecole(TenantMixin):
     @property
     def est_public(self):
         return self.schema_name == "public"
+
+    @property
+    def infos_pays(self):
+        return PAYS.get(self.pays, PAYS["SN"])
 
     def modules_actifs(self):
         inclus = list(self.forfait.modules) if self.forfait else []

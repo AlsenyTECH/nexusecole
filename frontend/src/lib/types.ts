@@ -1,6 +1,7 @@
 export type Config = {
   nom: string; ville: string; logo_url: string; couleur_primaire: string; couleur_secondaire: string;
   modules: string[]; statut: string; lecture_seule: boolean;
+  pays: string; indicatif: string; chiffres_telephone: number; devise: string;
 };
 export type Moi = {
   id: number; email: string; prenom: string; nom: string; telephone: string; role: string; role_nom?: string; permissions?: string[];
@@ -83,6 +84,7 @@ export type Resultats = {
 };
 export type Bulletin = {
   id: number; inscription: number; periode: number; empreinte: string; code: string; emis_le: string;
+  annule_le?: string | null; motif_annulation?: string;
   contenu: Omit<ResultatEleve, "inscription" | "prenom" | "nom"> & {
     ecole: string; annee: string; periode: string; classe: string; effectif: number; bareme: number;
     statistiques: Resultats["statistiques"];

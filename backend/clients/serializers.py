@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from . import services
 from .models import Ecole, Facture, Forfait, Module
+from .pays import CHOIX_PAYS
 
 
 class ForfaitSerializer(serializers.ModelSerializer):
@@ -25,7 +26,7 @@ class EcoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ecole
         fields = [
-            "id", "nom", "schema_name", "domaine", "type_etablissement", "ville", "telephone", "email",
+            "id", "nom", "schema_name", "domaine", "type_etablissement", "ville", "pays", "telephone", "email",
             "logo_url", "couleur_primaire", "couleur_secondaire", "statut", "forfait",
             "modules_supplementaires", "modules_actifs", "hebergement", "fin_essai", "cree_le",
         ]
@@ -57,6 +58,7 @@ class CreationEcoleSerializer(serializers.Serializer):
     forfait = serializers.SlugRelatedField(slug_field="code", queryset=Forfait.objects.filter(actif=True))
     type_etablissement = serializers.ChoiceField(choices=Ecole.Type.choices, default=Ecole.Type.PRIVE_LAIC)
     ville = serializers.CharField(required=False, allow_blank=True, default="")
+    pays = serializers.ChoiceField(choices=CHOIX_PAYS, default="SN")
     telephone = serializers.CharField(required=False, allow_blank=True, default="")
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     couleur_primaire = serializers.RegexField(r"^#[0-9A-Fa-f]{6}$", required=False, default="#0F766E")

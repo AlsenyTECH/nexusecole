@@ -26,6 +26,7 @@ CATALOGUE = {
     "notes.saisir": ("Pédagogie", "Saisir les notes de ses cours / classes attribués"),
     "notes.saisir_toutes": ("Pédagogie", "Saisir les notes de toutes les classes"),
     "notes.valider": ("Pédagogie", "Valider les notes et tenir le conseil de classe"),
+    "conseils.rouvrir": ("Pédagogie", "Rouvrir un conseil de classe tenu (annule les bulletins émis)"),
     "absences.saisir": ("Pédagogie", "Faire l'appel et saisir les absences"),
     "emploi_du_temps.gerer": ("Pédagogie", "Construire l'emploi du temps des classes"),
     # Administration

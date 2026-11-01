@@ -33,7 +33,12 @@ export function Bulletin({ famille = false }: { famille?: boolean }) {
         <Button variant="secondary" onClick={() => window.close()}>Fermer</Button>
         <Button onClick={() => window.print()}><Printer /> Imprimer</Button>
       </div>
-      <article className="document mx-auto max-w-3xl rounded-2xl border border-border bg-card p-8 text-[#14201c] shadow-carte">
+      <article className="document relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-border bg-card p-8 text-[#14201c] shadow-carte">
+        {b.annule_le ? (
+          <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="-rotate-[20deg] rounded-xl border-4 border-[#d03b3b] px-6 py-2 font-heading text-7xl font-bold text-[#d03b3b] opacity-25">ANNULÉ</span>
+          </div>
+        ) : null}
         <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-4">
           <div>
             <div className="font-heading text-2xl font-semibold">{c.ecole}</div>

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Page } from "./api";
+import { pays } from "./format";
 import type { Annee, Classe } from "./types";
 
 export function useAnnees() {
@@ -25,10 +26,11 @@ export function useRafraichir() {
   return (...cles: string[]) => cles.forEach((c) => client.invalidateQueries({ queryKey: [c] }));
 }
 
-/** Numéro sénégalais → lien WhatsApp (221 ajouté si besoin). */
+/** Numéro local → lien WhatsApp (indicatif du pays de l'école ajouté si besoin ; « 00… » = numéro international). */
 export function lienWhatsApp(telephone: string, message: string) {
   let n = telephone.replace(/\D/g, "");
-  if (n.length === 9) n = `221${n}`;
+  if (n.startsWith("00")) n = n.slice(2);
+  else if (n.length === pays.chiffres) n = `${pays.indicatif}${n}`;
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(message)}` : null;
 }
 
