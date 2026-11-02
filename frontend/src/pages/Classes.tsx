@@ -87,8 +87,13 @@ export function Classes() {
 
 function NouvelleAnnee({ ouvert, fermer }: { ouvert: boolean; fermer: () => void }) {
   const rafraichir = useRafraichir();
-  const an = new Date().getMonth() >= 7 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  const [f, setF] = useState({ libelle: `${an}-${an + 1}`, debut: `${an}-10-01`, fin: `${an + 1}-07-31`, active: true });
+  const { data: annees = [] } = useAnnees();
+  // Préparer l'année suivante ne doit pas la rendre active : l'école continue de travailler sur l'année en cours
+  const derniere = Math.max(0, ...annees.map((a) => Number(a.debut.slice(0, 4))));
+  const an = derniere ? derniere + 1 : new Date().getMonth() >= 7 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  const vide = { libelle: `${an}-${an + 1}`, debut: `${an}-10-01`, fin: `${an + 1}-07-31`, active: !annees.some((a) => a.active) };
+  const [f, setF] = useState(vide);
+  useEffect(() => { if (ouvert) setF(vide); }, [ouvert]); // eslint-disable-line react-hooks/exhaustive-deps
   async function valider(e: FormEvent) {
     e.preventDefault();
     try {
@@ -109,8 +114,14 @@ function NouvelleAnnee({ ouvert, fermer }: { ouvert: boolean; fermer: () => void
           <Champ label="Début"><Input type="date" required value={f.debut} onChange={(e) => setF({ ...f, debut: e.target.value })} /></Champ>
           <Champ label="Fin"><Input type="date" required value={f.fin} onChange={(e) => setF({ ...f, fin: e.target.value })} /></Champ>
           <label className="flex items-center gap-3 text-sm sm:col-span-2">
-            <Switch checked={f.active} onCheckedChange={(v) => setF({ ...f, active: v })} /> Année active (remplace l'année active actuelle)
+            <Switch checked={f.active} onCheckedChange={(v) => setF({ ...f, active: v })} /> Rendre active maintenant
           </label>
+          {f.active && annees.some((a) => a.active) ? (
+            <p className="text-xs text-[#7a5600] sm:col-span-2">
+              Attention : l'année active actuelle sera remplacée. Inscriptions, frais, notes, cartes… passeront sur la nouvelle année,
+              qui n'a pas encore de classes. Pour préparer la rentrée, laissez-la inactive et activez-la le jour venu.
+            </p>
+          ) : null}
           <DialogFooter className="sm:col-span-2">
             <Button type="button" variant="secondary" onClick={fermer}>Annuler</Button>
             <Button type="submit">Créer</Button>

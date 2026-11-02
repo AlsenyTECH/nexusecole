@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, Landmark, Layers, PartyPopper, Presentation, ReceiptText, ScanLine, ShieldCheck, Store, UserCheck, UsersRound } from "lucide-react";
+import { AlerteAnnee } from "@/components/AlerteAnnee";
 import { Connexion } from "@/components/Connexion";
 import { Layout, type Groupe } from "@/components/Layout";
 import { api } from "@/lib/api";
@@ -151,7 +152,7 @@ export function EcoleApp() {
             marque={{ nom: config.nom, sousTitre: config.ville || "Espace établissement", logo: config.logo_url || undefined }}
             utilisateur={{ prenom: moi.prenom, nom: moi.nom || moi.email, detail: moi.role_nom || ROLES[moi.role] || moi.role }}
             deconnecter={deconnecter}
-            bandeau={lectureSeule}
+            bandeau={<>{lectureSeule}<AlerteAnnee /></>}
           />
         }
       >
