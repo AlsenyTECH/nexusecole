@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from clients.models import Module
 from comptes.models import Role, Utilisateur
 from comptes.permissions import AbonnementValide, ModuleActif, permission
-from comptes.views import PersonnelSerializer, role_origine
+from comptes.views import PersonnelSerializer, role_origine, supprimer_compte
 from scolarite.models import AnneeScolaire, Classe
 from scolarite.perimetre import filtrer
 
@@ -84,11 +84,14 @@ class EnseignantSerializer(PersonnelSerializer):
 
 
 class EnseignantViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
-                        mixins.UpdateModelMixin, viewsets.GenericViewSet):
+                        mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     queryset = (Utilisateur.objects.filter(role=Role.ENSEIGNANT)
                 .select_related("role_ecole", "profil_enseignant").prefetch_related("profil_enseignant__matieres"))
     serializer_class = EnseignantSerializer
     permission_classes = [AbonnementValide, permission("utilisateurs.gerer")]
+
+    def perform_destroy(self, compte):
+        supprimer_compte(self.request.user, compte)
 
     @action(detail=True, methods=["put"], permission_classes=[AbonnementValide, permission("scolarite.parametrer")])
     @transaction.atomic

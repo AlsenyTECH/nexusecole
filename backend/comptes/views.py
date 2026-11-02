@@ -180,6 +180,8 @@ class PersonnelSerializer(serializers.ModelSerializer):
                 raise ValidationError({"role": "Vous ne pouvez pas changer votre propre rôle."})
             if attrs.get("is_active") is False:
                 raise ValidationError({"is_active": "Vous ne pouvez pas désactiver votre propre compte."})
+        if self.instance is not None and attrs.get("is_active") is False:
+            verifier_geste_sur_compte(demandeur, self.instance)
         if "role_ecole" in attrs and not _peut_donner(demandeur, attrs["role_ecole"].permissions):
             raise PermissionDenied("Ce rôle a des droits que vous n'avez pas : vous ne pouvez pas l'attribuer.")
 
@@ -210,8 +212,8 @@ class PersonnelSerializer(serializers.ModelSerializer):
 
 
 class PersonnelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin,
-                       mixins.UpdateModelMixin, viewsets.GenericViewSet):
-    """Pas de suppression : on désactive un compte (is_active=false) pour garder l'historique."""
+                       mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Suppression seulement d'un compte qui n'a jamais rien fait ; sinon on le bloque (is_active=false)."""
 
     queryset = Utilisateur.objects.filter(role__in=TYPES_PERSONNEL).select_related("role_ecole")
     serializer_class = PersonnelSerializer
@@ -222,3 +224,78 @@ class PersonnelViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, mixins.Re
         if role := self.request.query_params.get("role"):
             qs = qs.filter(role=role)
         return qs
+
+    def perform_destroy(self, compte):
+        supprimer_compte(self.request.user, compte)
+
+
+# --------------------------------------------------------------------------- #
+# Tous les comptes : bloquer / débloquer ; supprimer seulement un compte sans aucune opération
+# --------------------------------------------------------------------------- #
+def verifier_geste_sur_compte(demandeur, compte, bloquer=True):
+    """Règles communes au blocage et à la suppression d'un compte."""
+    if compte.pk == demandeur.pk:
+        raise ValidationError({"detail": "Vous ne pouvez pas bloquer ou supprimer votre propre compte."})
+    if compte.role == Role.DIRECTEUR:
+        if demandeur.role != Role.DIRECTEUR:
+            raise PermissionDenied("Seul un directeur peut bloquer ou supprimer un directeur.")
+        if bloquer and not Utilisateur.objects.filter(role=Role.DIRECTEUR, is_active=True).exclude(pk=compte.pk).exists():
+            raise ValidationError({"detail": "C'est le dernier directeur actif : l'école ne serait plus administrée."})
+
+
+def supprimer_compte(demandeur, compte):
+    """
+    Un compte qui a effectué des opérations (encaissement, note, appel, vente…) est protégé par la base
+    (clés étrangères PROTECT) : il se bloque, il ne se supprime pas, pour garder la trace de qui a fait quoi.
+    """
+    from django.db import transaction
+    from django.db.models import ProtectedError, RestrictedError
+
+    verifier_geste_sur_compte(demandeur, compte)
+    try:
+        with transaction.atomic():
+            compte.delete()
+    except (ProtectedError, RestrictedError):
+        raise ValidationError({"detail": "Ce compte a effectué des opérations dans l'application : il ne peut pas être supprimé "
+                                         "(traçabilité). Bloquez son accès à la place."})
+
+
+class CompteSerializer(serializers.ModelSerializer):
+    role_nom = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Utilisateur
+        fields = ["id", "email", "prenom", "nom", "telephone", "role", "role_nom", "is_active", "last_login", "cree_le"]
+        read_only_fields = ["email", "prenom", "nom", "telephone", "role", "last_login", "cree_le"]
+
+    def get_role_nom(self, u):
+        if u.role == Role.PARENT:
+            return "Parent / tuteur"
+        return u.role_ecole.nom if u.role_ecole_id else u.get_role_display()
+
+
+class CompteViewSet(mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
+    """Tous les comptes de l'école (personnel, enseignants, parents) : recherche, blocage, déblocage."""
+
+    queryset = Utilisateur.objects.exclude(role=Role.SUPERADMIN).select_related("role_ecole").order_by("nom", "prenom")
+    serializer_class = CompteSerializer
+    permission_classes = [AbonnementValide, permission("utilisateurs.gerer")]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = super().get_queryset()
+        if q := self.request.query_params.get("q"):
+            qs = qs.filter(Q(nom__icontains=q) | Q(prenom__icontains=q) | Q(email__icontains=q) | Q(telephone__icontains=q))
+        if role := self.request.query_params.get("role"):
+            qs = qs.filter(role=role)
+        if self.request.query_params.get("bloques") == "1":
+            qs = qs.filter(is_active=False)
+        return qs
+
+    def perform_update(self, serializer):
+        actif = serializer.validated_data.get("is_active")
+        if actif is not None:
+            verifier_geste_sur_compte(self.request.user, serializer.instance, bloquer=not actif)
+        serializer.save()

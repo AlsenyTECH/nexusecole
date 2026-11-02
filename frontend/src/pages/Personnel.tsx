@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, UsersRound } from "lucide-react";
+import { Plus, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, Champ, Choix, EnTete, Liste, Pastille } from "@/components/design";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { api, messageErreur, patch, post, type Page } from "@/lib/api";
+import { api, messageErreur, patch, post, supprimer, type Page } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateHeure } from "@/lib/format";
 import { useRafraichir, useRoles } from "@/lib/requetes";
@@ -31,6 +31,17 @@ export function Personnel() {
   const roles = useRolesPersonnel();
   const [nouveau, setNouveau] = useState(false);
 
+  async function retirer(c: Compte) {
+    if (!confirm(`Supprimer le compte de ${c.prenom} ${c.nom} ? Possible seulement s'il n'a jamais rien fait dans l'application ; sinon, bloquez-le.`)) return;
+    try {
+      await supprimer(`/api/personnel/${c.id}`);
+      toast.success("Compte supprimé");
+      rafraichir("personnel", "roles", "comptes");
+    } catch (e) {
+      toast.error(messageErreur(e));
+    }
+  }
+
   async function modifier(c: Compte, champs: Partial<Compte>) {
     try {
       await patch(`/api/personnel/${c.id}`, champs);
@@ -42,7 +53,7 @@ export function Personnel() {
 
   return (
     <div className="space-y-6">
-      <EnTete titre="Personnel" sousTitre="Direction, secrétariat, comptabilité, surveillance… Les enseignants ont leur propre page. Un compte se désactive, il ne se supprime pas."
+      <EnTete titre="Personnel" sousTitre="Direction, secrétariat, comptabilité, surveillance… Les enseignants ont leur propre page. Un compte qui a travaillé se bloque (désactiver) ; seul un compte jamais utilisé se supprime."
         actions={<Button onClick={() => setNouveau(true)}><Plus /> Nouveau compte</Button>} />
       {comptes?.length ? (
         <Liste>
@@ -61,6 +72,7 @@ export function Personnel() {
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Switch checked={c.is_active} disabled={c.id === moi?.id} onCheckedChange={(v) => modifier(c, { is_active: v })} /> Actif
               </label>
+              {c.id !== moi?.id ? <Button size="icon" variant="ghost" aria-label={`Supprimer ${c.prenom} ${c.nom}`} onClick={() => retirer(c)}><Trash2 /></Button> : null}
             </div>
           ))}
         </Liste>

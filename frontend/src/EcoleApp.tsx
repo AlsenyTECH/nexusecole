@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, Landmark, Layers, PartyPopper, Presentation, ReceiptText, ScanLine, ShieldCheck, Store, UserCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, KeyRound, Landmark, Layers, PartyPopper, Presentation, ReceiptText, Repeat, ScanLine, ShieldCheck, Store, UserCheck, UsersRound } from "lucide-react";
 import { AlerteAnnee } from "@/components/AlerteAnnee";
 import { Connexion } from "@/components/Connexion";
 import { Layout, type Groupe } from "@/components/Layout";
@@ -14,6 +14,8 @@ import { FamilleApp } from "@/famille/FamilleApp";
 import { Accueil } from "@/pages/Accueil";
 import { Activites } from "@/pages/Activites";
 import { Cartes } from "@/pages/Cartes";
+import { Comptes } from "@/pages/Comptes";
+import { FinAnnee } from "@/pages/FinAnnee";
 import { Controle } from "@/pages/Controle";
 import { ImpressionCartes } from "@/pages/ImpressionCartes";
 import { PointsDeVente } from "@/pages/PointsDeVente";
@@ -100,6 +102,7 @@ export function EcoleApp() {
       liens: [
         { vers: "/eleves", libelle: "Élèves", icone: GraduationCap, visible: peut("eleves.voir") },
         { vers: "/classes", libelle: "Classes et années", icone: Layers, visible: peut("eleves.voir") },
+        { vers: "/fin-annee", libelle: "Fin d'année et réinscriptions", icone: Repeat, visible: peut("notes.valider") || peut("inscriptions.gerer") },
         { vers: "/cartes", libelle: "Cartes scolaires", icone: CreditCard, visible: carte && peut("cartes.gerer") },
         { vers: "/activites", libelle: "Activités", icone: PartyPopper, visible: activites && peut("activites.gerer") },
       ],
@@ -126,6 +129,7 @@ export function EcoleApp() {
       liens: [
         { vers: "/enseignants", libelle: "Enseignants", icone: Presentation, visible: peut("utilisateurs.gerer") },
         { vers: "/personnel", libelle: "Personnel", icone: UsersRound, visible: peut("utilisateurs.gerer") },
+        { vers: "/comptes", libelle: "Comptes et accès", icone: KeyRound, visible: peut("utilisateurs.gerer") },
         { vers: "/roles", libelle: "Rôles et droits", icone: ShieldCheck, visible: peut("roles.gerer") },
         { vers: "/caisses", libelle: "Caisses et points de vente", icone: Store, visible: carte && peut("ventes.parametrer") },
       ],
@@ -170,6 +174,8 @@ export function EcoleApp() {
         <Route path="emploi-du-temps" element={<EmploiDuTemps />} />
         <Route path="enseignants" element={<Enseignants />} />
         <Route path="controle" element={<Controle />} />
+        <Route path="fin-annee" element={<FinAnnee />} />
+        <Route path="comptes" element={<Comptes />} />
         <Route path="vente" element={<PointVente />} />
         <Route path="cartes" element={<Cartes />} />
         <Route path="activites" element={<Activites />} />

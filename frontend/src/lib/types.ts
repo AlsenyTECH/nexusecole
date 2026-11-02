@@ -6,7 +6,10 @@ export type Config = {
 export type Moi = {
   id: number; email: string; prenom: string; nom: string; telephone: string; role: string; role_nom?: string; permissions?: string[];
 };
-export type Annee = { id: number; libelle: string; debut: string; fin: string; active: boolean };
+export type Annee = {
+  id: number; libelle: string; debut: string; fin: string; active: boolean;
+  statut: "preparation" | "active" | "cloturee"; statut_libelle: string;
+};
 export type Classe = { id: number; annee: number; nom: string; niveau: string; bareme: number; effectif: number };
 export type Eleve = {
   id: number; matricule: string; prenom: string; nom: string; sexe: "F" | "M"; date_naissance: string | null;

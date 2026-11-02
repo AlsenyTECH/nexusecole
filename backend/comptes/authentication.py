@@ -29,6 +29,17 @@ class TenantJWTAuthentication(JWTAuthentication):
 
 
 class ConnexionSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        # Compte bloqué : on le dit (seulement à qui connaît le bon mot de passe, rien n'est révélé aux autres)
+        from rest_framework.exceptions import AuthenticationFailed
+
+        from .models import Utilisateur
+
+        u = Utilisateur.objects.filter(email=str(attrs.get(self.username_field, "")).lower(), is_active=False).first()
+        if u and u.check_password(attrs.get("password", "")):
+            raise AuthenticationFailed("Votre accès a été bloqué par l'établissement. Contactez la direction.", code="compte_bloque")
+        return super().validate(attrs)
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -39,5 +50,11 @@ class ConnexionSerializer(TokenObtainPairSerializer):
 
 class RafraichissementSerializer(TokenRefreshSerializer):
     def validate(self, attrs):
-        verifier_schema(RefreshToken(attrs["refresh"]))
+        jeton = RefreshToken(attrs["refresh"])
+        verifier_schema(jeton)
+        # Compte bloqué entre-temps : plus de nouveau jeton (les jetons d'accès sont déjà refusés à chaque requête)
+        from .models import Utilisateur
+
+        if not Utilisateur.objects.filter(pk=jeton.get("user_id"), is_active=True).exists():
+            raise InvalidToken("Compte bloqué")
         return super().validate(attrs)

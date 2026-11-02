@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from clients.models import Module
 from comptes.permissions import AbonnementValide, ModuleActif, permission
 
-from . import services
+from . import passage, services
 from .models import AnneeScolaire, Classe, Eleve, Inscription, LienResponsable, Responsable
 from .perimetre import filtrer
 
@@ -48,13 +49,20 @@ class ConfigEcoleView(APIView):
 
 
 class AnneeScolaireSerializer(serializers.ModelSerializer):
+    statut_libelle = serializers.CharField(source="get_statut_display", read_only=True)
+
     class Meta:
         model = AnneeScolaire
-        fields = ["id", "libelle", "debut", "fin", "active"]
+        fields = ["id", "libelle", "debut", "fin", "statut", "statut_libelle", "active"]
+        read_only_fields = ["statut"]
 
 
 class ClasseSerializer(serializers.ModelSerializer):
-    effectif = serializers.IntegerField(source="eleves.count", read_only=True)
+    # Inscrits dans la classe (et non élèves dont c'est la classe « courante ») : juste aussi pour l'année en préparation
+    effectif = serializers.SerializerMethodField()
+
+    def get_effectif(self, c):
+        return c.inscriptions.filter(statut=Inscription.Statut.ACTIVE).count()
 
     class Meta:
         model = Classe
@@ -144,19 +152,48 @@ class BaseEcoleViewSet(viewsets.ModelViewSet):
 
 
 class AnneeScolaireViewSet(BaseEcoleViewSet):
+    """
+    Une année se crée en préparation (ou active si l'école n'en a aucune). « statut » l'active,
+    la remet en préparation ou la clôture ; « reconduire » prépare l'année suivante à partir de celle-ci.
+    """
+
     queryset = AnneeScolaire.objects.all()
     serializer_class = AnneeScolaireSerializer
+    http_method_names = ["get", "post", "patch", "head", "options"]  # une année ne se supprime pas
 
     def perform_create(self, serializer):
-        self._une_seule_active(serializer.save())
+        annee = serializer.save(active=False)
+        if serializer.validated_data.get("active") or not AnneeScolaire.objects.filter(active=True).exists():
+            passage.activer(annee)
 
     def perform_update(self, serializer):
-        self._une_seule_active(serializer.save())
+        active = serializer.validated_data.pop("active", None)
+        annee = serializer.save()
+        if active is True:
+            passage.activer(annee)
+        elif active is False and annee.active:
+            passage.changer_statut(annee, AnneeScolaire.Statut.CLOTUREE)
 
-    @staticmethod
-    def _une_seule_active(annee):
-        if annee.active:
-            AnneeScolaire.objects.exclude(pk=annee.pk).update(active=False)
+    @action(detail=True, methods=["post"])
+    def statut(self, request, pk=None):
+        annee = _metier(lambda: passage.changer_statut(self.get_object(), request.data.get("statut")))
+        return Response(AnneeScolaireSerializer(annee).data)
+
+    @action(detail=True, methods=["post"])
+    def reconduire(self, request, pk=None):
+        """{libelle, debut, fin, classes, frais, cours, periodes} → nouvelle année en préparation."""
+        from datetime import date
+
+        d = request.data
+        try:
+            debut, fin = date.fromisoformat(d.get("debut", "")), date.fromisoformat(d.get("fin", ""))
+        except ValueError:
+            raise ValidationError({"detail": "Dates invalides."})
+        cible, bilan = _metier(lambda: passage.reconduire(
+            self.get_object(), libelle=str(d.get("libelle", "")).strip()[:20], debut=debut, fin=fin,
+            classes=bool(d.get("classes", True)), frais=bool(d.get("frais", True)),
+            cours=bool(d.get("cours", True)), periodes=bool(d.get("periodes", True))))
+        return Response({"annee": AnneeScolaireSerializer(cible).data, "bilan": bilan}, status=status.HTTP_201_CREATED)
 
 
 class ClasseViewSet(BaseEcoleViewSet):
@@ -271,6 +308,8 @@ class InscriptionSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         eleve = attrs.get("eleve", getattr(self.instance, "eleve", None))
         classe = attrs.get("classe", getattr(self.instance, "classe", None))
+        if self.instance is None and classe.annee.statut == AnneeScolaire.Statut.CLOTUREE:
+            raise serializers.ValidationError("Cette année scolaire est clôturée.")
         doublon = Inscription.objects.filter(eleve=eleve, annee=classe.annee).exclude(pk=getattr(self.instance, "pk", None))
         if doublon.exists():
             raise serializers.ValidationError("Cet élève est déjà inscrit pour cette année scolaire.")
@@ -340,3 +379,40 @@ class TableauDeBordView(APIView):
                 ],
             }
         return Response(data)
+
+
+# --------------------------------------------------------------------------- #
+# Fin d'année : décisions du conseil et réinscriptions
+# --------------------------------------------------------------------------- #
+class DecisionsView(APIView):
+    """GET ?classe= : moyennes annuelles, suggestions et décisions ; PUT {classe, decisions: [{inscription, decision, commentaire}]}."""
+
+    permission_classes = [AbonnementValide, permission("notes.voir", "notes.valider")]
+
+    def _classe(self, request, source):
+        return get_object_or_404(filtrer(Classe.objects.all(), request.user, "id"), pk=source.get("classe"))
+
+    def get(self, request):
+        return Response(passage.decisions_classe(self._classe(request, request.query_params)))
+
+    def put(self, request):
+        classe = self._classe(request, request.data)
+        n = _metier(lambda: passage.enregistrer_decisions(classe, request.data.get("decisions", []), request.user))
+        return Response({"enregistrees": n})
+
+
+class ReinscriptionsView(APIView):
+    """GET ?annee=<année à préparer> : élèves de l'année précédente et classe proposée ; POST {annee, lignes: [{eleve, classe}]}."""
+
+    permission_classes = [AbonnementValide, permission("eleves.voir", "inscriptions.gerer")]
+
+    def get(self, request):
+        cible = get_object_or_404(AnneeScolaire, pk=request.query_params.get("annee"))
+        source, lignes = passage.propositions(cible)
+        return Response({"source": AnneeScolaireSerializer(source).data if source else None, "lignes": lignes})
+
+    def post(self, request):
+        cible = get_object_or_404(AnneeScolaire, pk=request.data.get("annee"))
+        n = _metier(lambda: passage.reinscrire(cible, request.data.get("lignes", []),
+                                              frais=request.tenant.a_module(Module.FRAIS)))
+        return Response({"reinscrits": n}, status=status.HTTP_201_CREATED)

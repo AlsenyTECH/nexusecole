@@ -4,10 +4,28 @@ from django.db import models
 
 
 class AnneeScolaire(models.Model):
+    """
+    Une année scolaire : en préparation (classes et frais prêts, réinscriptions possibles),
+    active (une seule à la fois : elle sert partout dans l'application) ou clôturée (archive).
+    """
+
+    class Statut(models.TextChoices):
+        PREPARATION = "preparation", "En préparation"
+        ACTIVE = "active", "Active"
+        CLOTUREE = "cloturee", "Clôturée"
+
     libelle = models.CharField(max_length=20, unique=True, help_text="ex. 2026-2027")
     debut = models.DateField()
     fin = models.DateField()
-    active = models.BooleanField(default=False)
+    statut = models.CharField(max_length=12, choices=Statut.choices, default=Statut.PREPARATION)
+    active = models.BooleanField(default=False, help_text="Tenu égal à statut == active (utilisé partout)")
+
+    def save(self, *args, **kwargs):
+        if self.active:
+            self.statut = self.Statut.ACTIVE
+        elif self.statut == self.Statut.ACTIVE:
+            self.active = True
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-debut"]
@@ -66,6 +84,23 @@ class Eleve(models.Model):
             if lien.responsable.telephone:
                 return lien.responsable.telephone
         return self.telephone_parent
+
+
+class DecisionFinAnnee(models.Model):
+    """Décision du conseil de fin d'année : base de la réinscription proposée pour l'année suivante."""
+
+    class Decision(models.TextChoices):
+        PASSE = "passe", "Passe en classe supérieure"
+        REDOUBLE = "redouble", "Redouble"
+        EXCLU = "exclu", "Exclu"
+        DEPART = "depart", "Quitte l'établissement"
+
+    inscription = models.OneToOneField("Inscription", on_delete=models.CASCADE, related_name="decision")
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    moyenne_annuelle = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    commentaire = models.CharField(max_length=200, blank=True)
+    par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    le = models.DateTimeField(auto_now=True)
 
 
 class Inscription(models.Model):

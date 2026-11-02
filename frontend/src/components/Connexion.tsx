@@ -21,7 +21,8 @@ export function Connexion({ nom, accroche, points, pied, logo }: {
     try {
       await connecter(email, mdp);
     } catch (err) {
-      toast.error(err instanceof ErreurApi && err.status === 401 ? "Email ou mot de passe incorrect." : messageErreur(err));
+      const bloque = err instanceof ErreurApi && /bloqué/.test(err.message);
+      toast.error(err instanceof ErreurApi && err.status === 401 && !bloque ? "Email ou mot de passe incorrect." : messageErreur(err));
     } finally {
       setEnvoi(false);
     }

@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from comptes.views import ConnexionView, MoiView, PersonnelViewSet, RafraichissementView, RoleViewSet
+from comptes.views import CompteViewSet, ConnexionView, MoiView, PersonnelViewSet, RafraichissementView, RoleViewSet
 from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, ConseilView, CoursViewSet,
                              EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
                              ReouvertureView, ResultatsView, SurveillanceViewSet, VerificationView)
@@ -17,7 +17,7 @@ from scolarite.famille import (BulletinFamilleView, EnfantRubriqueView, EnfantsV
 from finances.views import (CaisseView, CaisseViewSet, FraisViewSet, ImpayesView, PaiementViewSet, RapportCaissesView,
                             SituationView, SouscriptionViewSet)
 from scolarite.views import (AnneeScolaireViewSet, ClasseViewSet, ConfigEcoleView, EleveViewSet, InscriptionViewSet,
-                              LienResponsableViewSet, ResponsableViewSet, TableauDeBordView)
+                              DecisionsView, LienResponsableViewSet, ReinscriptionsView, ResponsableViewSet, TableauDeBordView)
 
 router = DefaultRouter(trailing_slash=False)
 router.register("annees", AnneeScolaireViewSet)
@@ -26,6 +26,7 @@ router.register("eleves", EleveViewSet)
 router.register("inscriptions", InscriptionViewSet)
 router.register("personnel", PersonnelViewSet)
 router.register("roles", RoleViewSet)
+router.register("comptes", CompteViewSet, basename="compte")
 router.register("enseignants", EnseignantViewSet, basename="enseignant")
 router.register("responsables", ResponsableViewSet)
 router.register("liens-responsables", LienResponsableViewSet)
@@ -62,6 +63,8 @@ urlpatterns = [
     path("api/appel", AppelView.as_view()),
     path("api/resultats", ResultatsView.as_view()),
     path("api/conseils", ConseilView.as_view()),
+    path("api/decisions", DecisionsView.as_view()),
+    path("api/reinscriptions", ReinscriptionsView.as_view()),
     path("api/conseils/rouvrir", ReouvertureView.as_view()),
     path("api/verifier/<str:code>", VerificationView.as_view()),
     path("api/famille/enfants", EnfantsView.as_view()),

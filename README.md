@@ -192,6 +192,9 @@ Paiement annuel (10 mois) : 2 mois offerts.
 - [x] **Phase 2b – Argent et carte** : services à la carte (transport, cantine…), caisses comptabilisées ou non,
   carte scolaire QR signée (impression, contrôle à l'entrée), porte-monnaie (grand livre chaîné, cantine, boutique,
   plafond), activités payantes et tickets — voir [docs/carte-et-paiements.md](docs/carte-et-paiements.md)
+- [x] **Rentrée scolaire** : années en préparation / active / clôturée, préparation de l'année suivante (classes, frais,
+  matières, trimestres reconduits ; affectations des enseignants remises à zéro), décisions de fin d'année et
+  réinscriptions proposées à valider, blocage de n'importe quel compte (suppression seulement sans historique)
 - [ ] **Phase 2c** : recharge Wave / Orange Money réelle (comptes marchands), comptes élèves, SMS/WhatsApp
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants

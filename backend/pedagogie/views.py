@@ -84,16 +84,7 @@ class PeriodeViewSet(BaseNotes, viewsets.ModelViewSet):
         annee = get_object_or_404(AnneeScolaire, pk=request.data.get("annee"))
         if annee.periodes.exists():
             raise ValidationError({"detail": "Cette année a déjà ses périodes."})
-        n = 3 if Parametres.actuels().decoupage == Parametres.Decoupage.TRIMESTRE else 2
-        nom = "trimestre" if n == 3 else "semestre"
-        duree = (annee.fin - annee.debut).days + 1
-        periodes = []
-        for i in range(n):
-            debut = annee.debut + timedelta(days=duree * i // n)
-            fin = annee.fin if i == n - 1 else annee.debut + timedelta(days=duree * (i + 1) // n - 1)
-            periodes.append(Periode(annee=annee, ordre=i + 1, debut=debut, fin=fin,
-                                    nom=f"{'1er' if i == 0 else f'{i + 1}e'} {nom}"))
-        Periode.objects.bulk_create(periodes)
+        services.generer_periodes(annee)
         return Response(PeriodeSerializer(annee.periodes.all(), many=True).data, status=status.HTTP_201_CREATED)
 
 

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { api, messageErreur, patch, post, remplacer, type Page } from "@/lib/api";
+import { api, messageErreur, patch, post, remplacer, supprimer, type Page } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAnneeActive, useClasses, useMatieres, useRafraichir, useRoles } from "@/lib/requetes";
 import type { Cours, Enseignant } from "@/lib/types";
@@ -26,6 +26,17 @@ export function Enseignants() {
   const { data: matieres = [] } = useMatieres();
   const [fiche, setFiche] = useState<Enseignant | "nouveau" | null>(null);
   const [classes, setClasses] = useState<Enseignant | null>(null);
+
+  async function retirer(e: Enseignant) {
+    if (!confirm(`Supprimer la fiche de ${e.prenom} ${e.nom} ? Possible seulement s'il n'a jamais rien saisi (notes, appel…) ; sinon, désactivez son compte.`)) return;
+    try {
+      await supprimer(`/api/enseignants/${e.id}`);
+      toast.success("Enseignant supprimé");
+      rafraichir("enseignants", "comptes", "cours");
+    } catch (err) {
+      toast.error(messageErreur(err));
+    }
+  }
 
   async function activer(e: Enseignant, actif: boolean) {
     try {
@@ -70,6 +81,7 @@ export function Enseignants() {
                 <div className="mt-auto flex flex-wrap gap-2">
                   {peut("scolarite.parametrer") ? <Button size="sm" onClick={() => setClasses(e)}><BookOpenCheck /> Classes et matières</Button> : null}
                   <Button size="sm" variant="secondary" onClick={() => setFiche(e)}><Pencil /> Fiche</Button>
+                  <Button size="sm" variant="ghost" className="ml-auto text-destructive" onClick={() => retirer(e)} aria-label={`Supprimer ${e.prenom} ${e.nom}`}><Trash2 /></Button>
                 </div>
               </div>
             );

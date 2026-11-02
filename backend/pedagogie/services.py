@@ -58,6 +58,23 @@ def cours_saisissables(user, annee):
     return qs.filter(Q(enseignant=user) | Q(classe__surveillances__surveillant=user)).distinct()
 
 
+def generer_periodes(annee):
+    """Découpe l'année en trimestres ou semestres (selon les paramètres de l'école)."""
+    from datetime import timedelta
+
+    from .models import Periode
+
+    n = 3 if Parametres.actuels().decoupage == Parametres.Decoupage.TRIMESTRE else 2
+    nom = "trimestre" if n == 3 else "semestre"
+    duree = (annee.fin - annee.debut).days + 1
+    periodes = []
+    for i in range(n):
+        debut = annee.debut + timedelta(days=duree * i // n)
+        fin = annee.fin if i == n - 1 else annee.debut + timedelta(days=duree * (i + 1) // n - 1)
+        periodes.append(Periode(annee=annee, ordre=i + 1, debut=debut, fin=fin, nom=f"{'1er' if i == 0 else f'{i + 1}e'} {nom}"))
+    return Periode.objects.bulk_create(periodes)
+
+
 def est_verrouille(classe, periode):
     return Conseil.objects.filter(classe=classe, periode=periode, rouvert_le__isnull=True).exists()
 
