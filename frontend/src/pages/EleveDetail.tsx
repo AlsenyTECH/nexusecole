@@ -5,6 +5,7 @@ import { ArrowLeft, Banknote, Ban, HeartPulse, Pencil, ReceiptText } from "lucid
 import { toast } from "sonner";
 import { Avatar, Champ, Choix, Indicateur, Liste, Pastille, Section } from "@/components/design";
 import { Encaissement } from "@/components/Encaissement";
+import { CartePorteMonnaie, ServicesEleve } from "@/components/CarteEleve";
 import { ResponsablesEleve } from "@/components/Responsables";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,8 @@ export function EleveDetail() {
       ) : null}
 
       <ResponsablesEleve eleve={eleve} espaceParents={!!config?.modules.includes("parents")} />
+      {config?.modules.includes("carte") ? <CartePorteMonnaie eleve={eleve} /> : null}
+      {courante && peut("frais.voir") && config?.modules.includes("frais") ? <ServicesEleve inscription={courante} /> : null}
       {courante && peut("frais.voir") ? <Finances inscription={courante.id} /> : null}
       <Encaissement inscription={courante?.id ?? null} ouvert={encaisser} fermer={() => setEncaisser(false)} />
       <ModifierEleve eleve={edition ? eleve : null} fermer={() => setEdition(false)} />

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, FileText, GraduationCap, Home, Layers, Presentation, ReceiptText, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, Landmark, Layers, PartyPopper, Presentation, ReceiptText, ScanLine, ShieldCheck, Store, UserCheck, UsersRound } from "lucide-react";
 import { Connexion } from "@/components/Connexion";
 import { Layout, type Groupe } from "@/components/Layout";
 import { api } from "@/lib/api";
@@ -11,6 +11,13 @@ import { definirPays, ROLES } from "@/lib/format";
 import type { Config } from "@/lib/types";
 import { FamilleApp } from "@/famille/FamilleApp";
 import { Accueil } from "@/pages/Accueil";
+import { Activites } from "@/pages/Activites";
+import { Cartes } from "@/pages/Cartes";
+import { Controle } from "@/pages/Controle";
+import { ImpressionCartes } from "@/pages/ImpressionCartes";
+import { PointsDeVente } from "@/pages/PointsDeVente";
+import { RapportCaisses } from "@/pages/RapportCaisses";
+import { PointVente } from "@/pages/Vente";
 import { Appel } from "@/pages/Appel";
 import { Bulletin } from "@/pages/Bulletin";
 import { Caisse } from "@/pages/Caisse";
@@ -74,6 +81,8 @@ export function EcoleApp() {
   const frais = config.modules.includes("frais");
   const notes = config.modules.includes("notes");
   const absences = config.modules.includes("absences");
+  const carte = config.modules.includes("carte");
+  const activites = config.modules.includes("activites");
   const groupes: Groupe[] = [
     {
       titre: "Pilotage",
@@ -81,6 +90,8 @@ export function EcoleApp() {
         { vers: "/", libelle: "Accueil", icone: Home },
         { vers: "/caisse", libelle: "Caisse", icone: Banknote, visible: frais && peut("frais.encaisser") },
         { vers: "/impayes", libelle: "Impayés", icone: AlertTriangle, visible: frais && peut("frais.rapports") },
+        { vers: "/controle", libelle: "Contrôle des cartes", icone: ScanLine, visible: carte && peut("acces.controler") },
+        { vers: "/vente", libelle: "Point de vente", icone: Store, visible: carte && peut("ventes.encaisser") },
       ],
     },
     {
@@ -88,6 +99,8 @@ export function EcoleApp() {
       liens: [
         { vers: "/eleves", libelle: "Élèves", icone: GraduationCap, visible: peut("eleves.voir") },
         { vers: "/classes", libelle: "Classes et années", icone: Layers, visible: peut("eleves.voir") },
+        { vers: "/cartes", libelle: "Cartes scolaires", icone: CreditCard, visible: carte && peut("cartes.gerer") },
+        { vers: "/activites", libelle: "Activités", icone: PartyPopper, visible: activites && peut("activites.gerer") },
       ],
     },
     {
@@ -102,7 +115,10 @@ export function EcoleApp() {
     },
     {
       titre: "Finances",
-      liens: [{ vers: "/frais", libelle: "Grille des frais", icone: ReceiptText, visible: frais && peut("frais.voir") }],
+      liens: [
+        { vers: "/frais", libelle: "Frais et services", icone: ReceiptText, visible: frais && peut("frais.voir") },
+        { vers: "/recettes", libelle: "Recettes par caisse", icone: Landmark, visible: frais && peut("frais.rapports") },
+      ],
     },
     {
       titre: "Réglages",
@@ -110,6 +126,7 @@ export function EcoleApp() {
         { vers: "/enseignants", libelle: "Enseignants", icone: Presentation, visible: peut("utilisateurs.gerer") },
         { vers: "/personnel", libelle: "Personnel", icone: UsersRound, visible: peut("utilisateurs.gerer") },
         { vers: "/roles", libelle: "Rôles et droits", icone: ShieldCheck, visible: peut("roles.gerer") },
+        { vers: "/caisses", libelle: "Caisses et points de vente", icone: Store, visible: carte && peut("ventes.parametrer") },
       ],
     },
   ];
@@ -125,11 +142,12 @@ export function EcoleApp() {
     <Routes>
       <Route path="/recus/:id" element={<Recu />} />
       <Route path="/bulletins/:id" element={<Bulletin />} />
+      <Route path="/cartes/impression" element={<ImpressionCartes />} />
       <Route
         element={
           <Layout
             groupes={groupes}
-            bas={["/", "/notes", "/appel", "/eleves", "/caisse", "/impayes"]}
+            bas={["/", "/controle", "/vente", "/notes", "/appel", "/eleves", "/caisse", "/impayes"]}
             marque={{ nom: config.nom, sousTitre: config.ville || "Espace établissement", logo: config.logo_url || undefined }}
             utilisateur={{ prenom: moi.prenom, nom: moi.nom || moi.email, detail: moi.role_nom || ROLES[moi.role] || moi.role }}
             deconnecter={deconnecter}
@@ -150,6 +168,12 @@ export function EcoleApp() {
         <Route path="cours" element={<Cours />} />
         <Route path="emploi-du-temps" element={<EmploiDuTemps />} />
         <Route path="enseignants" element={<Enseignants />} />
+        <Route path="controle" element={<Controle />} />
+        <Route path="vente" element={<PointVente />} />
+        <Route path="cartes" element={<Cartes />} />
+        <Route path="activites" element={<Activites />} />
+        <Route path="caisses" element={<PointsDeVente />} />
+        <Route path="recettes" element={<RapportCaisses />} />
         <Route path="personnel" element={<Personnel />} />
         <Route path="roles" element={<Roles />} />
         <Route path="*" element={<Navigate to="/" replace />} />

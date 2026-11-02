@@ -34,6 +34,11 @@ class Command(BaseCommand):
             self.stdout.write("  Pédagogie de démonstration ajoutée (matières, enseignants, notes, absences).")
         if demo.remplir_familles(ecole_demo):
             self.stdout.write("  Familles de démonstration ajoutées (parents, tuteur, emploi du temps).")
+        if "paiement_mobile" not in (ecole_demo.modules_supplementaires or []):
+            ecole_demo.modules_supplementaires = [*(ecole_demo.modules_supplementaires or []), "paiement_mobile"]
+            ecole_demo.save(update_fields=["modules_supplementaires"])
+        if demo.remplir_carte(ecole_demo):
+            self.stdout.write("  Services, cartes, porte-monnaie, cantine, boutique et activités de démonstration ajoutés.")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"

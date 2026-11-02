@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Config } from "@/lib/types";
 import { Bulletin } from "@/pages/Bulletin";
+import { PaiementSimule } from "@/pages/PaiementSimule";
 import { Recu } from "@/pages/Recu";
 import { AccueilFamille, FicheEnfant, type Enfants } from "./pages";
 
@@ -23,6 +24,7 @@ export function FamilleApp({ config }: { config: Config }) {
     <Routes>
       <Route path="/bulletins/:id" element={<Bulletin famille />} />
       <Route path="/recus/:id" element={<Recu famille />} />
+      <Route path="/paiement-simule/:reference" element={<PaiementSimule />} />
       <Route element={
         <Layout groupes={groupes} bas={["/", ...enfants.map((e) => `/enfants/${e.id}`)]}
           marque={{ nom: config.nom, sousTitre: "Espace famille", logo: config.logo_url || undefined }}

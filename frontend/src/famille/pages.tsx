@@ -1,16 +1,19 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Banknote, CalendarClock, CalendarDays, ChevronRight, ClipboardList, FileText, ReceiptText, UserCheck } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarClock, CalendarDays, ChevronRight, ClipboardList, FileText, PartyPopper, ReceiptText, UserCheck, Wallet } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, Bandeau, Indicateur, Liste, Pastille, Section } from "@/components/design";
 import { GrilleSemaine } from "@/components/Grille";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { api } from "@/lib/api";
+import { api, messageErreur, post } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { date, dateHeure, fcfa } from "@/lib/format";
 import { note, rang } from "@/lib/requetes";
 import type { Config, Creneau } from "@/lib/types";
+import { useRafraichir } from "@/lib/requetes";
 import { cn, ouvrirDocument } from "@/lib/utils";
+import { OngletActivites, OngletPorteMonnaie } from "./porteMonnaie";
 
 export type Enfant = {
   id: number; prenom: string; nom: string; matricule: string; sexe: "F" | "M"; date_naissance: string | null;
@@ -27,7 +30,8 @@ type AVenir = { date: string; titre: string; type: string; matiere: string; sur:
 type BulletinResume = { id: number; periode: string; annee: string; classe: string; moyenne: number | null; bareme: number;
   rang: number | null; effectif: number; mention: string; emis_le: string }[] | null;
 type Scolarite = {
-  total: number; paye: number; reste: number; en_retard: number;
+  total: number; paye: number; reste: number; en_retard: number; payer_par_porte_monnaie: boolean;
+  services: { libelle: string; depuis: string; montant: number; periodicite: string }[];
   echeances: { id: number; libelle: string; montant: number; date_limite: string; paye: number; reste: number }[];
   paiements: { id: number; numero_recu: string; montant: number; moyen: string; encaisse_le: string }[];
 } | null;
@@ -86,6 +90,8 @@ const ONGLETS = [
   { cle: "bulletins", libelle: "Bulletins", icone: FileText, module: "notes" },
   { cle: "absences", libelle: "Absences", icone: UserCheck, module: "absences" },
   { cle: "scolarite", libelle: "Scolarité", icone: Banknote, module: "frais" },
+  { cle: "porte-monnaie", libelle: "Porte-monnaie", icone: Wallet, module: "carte" },
+  { cle: "activites", libelle: "Activités", icone: PartyPopper, module: "activites" },
 ];
 
 export function FicheEnfant({ donnees }: { donnees?: Enfants }) {
@@ -116,7 +122,9 @@ export function FicheEnfant({ donnees }: { donnees?: Enfants }) {
           </button>
         ))}
       </div>
-      {!enfant.classe ? <EmptyState icon={UserCheck} title="Pas encore inscrit pour l'année en cours" />
+      {actif?.cle === "porte-monnaie" ? <OngletPorteMonnaie id={enfant.id} prenom={enfant.prenom} />
+        : !enfant.classe ? <EmptyState icon={UserCheck} title="Pas encore inscrit pour l'année en cours" />
+        : actif?.cle === "activites" ? <OngletActivites id={enfant.id} />
         : actif?.cle === "notes" ? <OngletNotes id={enfant.id} />
         : actif?.cle === "a-venir" ? <OngletAVenir id={enfant.id} />
         : actif?.cle === "emploi-du-temps" ? <OngletEmploiDuTemps id={enfant.id} />
@@ -229,7 +237,18 @@ function OngletAbsences({ id }: { id: number }) {
 }
 
 function OngletScolarite({ id }: { id: number }) {
+  const rafraichir = useRafraichir();
   const { data: s } = useQuery(rubrique<Scolarite>(id, "scolarite"));
+  async function payer(e: { id: number; libelle: string; reste: number }) {
+    if (!confirm(`Payer « ${e.libelle} » (${fcfa(e.reste)}) avec le porte-monnaie de la carte ?`)) return;
+    try {
+      const r = await post<{ paiement: number; numero_recu: string }>(`/api/famille/enfants/${id}/echeances/${e.id}/payer`);
+      toast.success(`Payé : reçu ${r.numero_recu}`);
+      rafraichir("famille");
+    } catch (err) {
+      toast.error(messageErreur(err));
+    }
+  }
   if (!s) return <p className="text-muted-foreground">Chargement…</p>;
   const aujourdhui = new Date().toLocaleDateString("sv-SE");
   return (
@@ -240,6 +259,18 @@ function OngletScolarite({ id }: { id: number }) {
         <Indicateur icone={ReceiptText} valeur={fcfa(s.reste)} libelle="reste à payer" ton="or" />
         <Indicateur icone={ReceiptText} valeur={fcfa(s.en_retard)} libelle="en retard" ton="rose" />
       </div>
+      {s.services.length ? (
+        <Section titre="Services">
+          <Liste>
+            {s.services.map((x) => (
+              <div key={x.libelle} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1"><div className="font-medium">{x.libelle}</div><div className="text-xs text-muted-foreground">depuis le {date(x.depuis)}</div></div>
+                <span className="text-sm chiffres">{fcfa(x.montant)}{x.periodicite === "mensuel" ? " / mois" : ""}</span>
+              </div>
+            ))}
+          </Liste>
+        </Section>
+      ) : null}
       <Section titre="Échéances">
         <Liste>
           {s.echeances.map((e) => (
@@ -248,6 +279,7 @@ function OngletScolarite({ id }: { id: number }) {
               <span className="text-sm chiffres">{fcfa(e.montant)}</span>
               {e.reste === 0 ? <Pastille ton="vert">Payée</Pastille> : e.date_limite < aujourdhui ? <Pastille ton="rouge">En retard</Pastille>
                 : e.paye ? <Pastille ton="or">Partielle</Pastille> : <Pastille ton="gris">À venir</Pastille>}
+              {e.reste > 0 && s.payer_par_porte_monnaie ? <Button size="sm" variant="ghost" onClick={() => payer(e)}>Payer</Button> : null}
             </div>
           ))}
         </Liste>

@@ -3,7 +3,7 @@ Frais scolaires d'une école (schéma de l'école).
 
 Principe comptable : on ne modifie ni ne supprime jamais un paiement. Le « payé » d'une échéance
 est la somme des imputations des paiements NON annulés ; une annulation est tracée (qui, quand,
-pourquoi). Les montants sont en FCFA entiers.
+pourquoi). Les montants sont des entiers, dans la monnaie de l'école.
 """
 from django.conf import settings
 from django.db import models
@@ -13,15 +13,53 @@ from django.db.models.functions import Coalesce
 from scolarite.models import AnneeScolaire, Inscription
 
 
+class Caisse(models.Model):
+    """
+    Destination de l'argent encaissé. La caisse de l'école est comptabilisée ; d'autres caisses
+    (foyer des élèves, coopérative, gouvernement scolaire…) recueillent des recettes qui
+    appartiennent aux élèves et ne sont pas comptées comme revenus de l'école.
+    """
+
+    nom = models.CharField(max_length=80, unique=True)
+    description = models.CharField(max_length=200, blank=True)
+    comptabilisee = models.BooleanField(default=True, help_text="Ses recettes sont des revenus de l'école")
+    code = models.CharField(max_length=20, unique=True, null=True, blank=True, help_text="Caisse d'origine (« ecole », « foyer »)")
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-comptabilisee", "nom"]
+
+    def __str__(self):
+        return self.nom
+
+    @classmethod
+    def de_l_ecole(cls):
+        return cls.objects.get_or_create(code="ecole", defaults={"nom": "Caisse de l'école", "comptabilisee": True})[0]
+
+
 class Frais(models.Model):
-    """Ligne de la grille des frais d'une année (ex. « Mensualité 6e » : 15 000 × 10)."""
+    """
+    Ligne de la grille des frais d'une année (ex. « Mensualité 6e » : 15 000 × 10).
+    Obligatoire : dû par tous les élèves des niveaux concernés, dès l'inscription.
+    Service à la carte (transport, cantine, études…) : dû seulement par les élèves inscrits au service.
+    """
 
     class Categorie(models.TextChoices):
         INSCRIPTION = "inscription", "Inscription"
         SCOLARITE = "scolarite", "Scolarité (mensualités)"
+        TRANSPORT = "transport", "Transport scolaire"
+        CANTINE = "cantine", "Cantine"
+        ETUDES = "etudes", "Études surveillées / cours de renfort"
+        GARDERIE = "garderie", "Garderie"
+        CLUB = "club", "Activités périscolaires / clubs"
         TENUE = "tenue", "Tenue / uniforme"
+        FOURNITURES = "fournitures", "Fournitures / manuels"
         ASSURANCE = "assurance", "Assurance"
         APE = "ape", "Cotisation APE"
+        EXAMEN = "examen", "Frais d'examen (CFEE, BFEM, BAC…)"
+        SORTIE = "sortie", "Sortie pédagogique"
+        MEDICAL = "medical", "Visite médicale"
+        CARTE = "carte", "Carte scolaire (remplacement)"
         AUTRE = "autre", "Autre"
 
     class Periodicite(models.TextChoices):
@@ -36,6 +74,7 @@ class Frais(models.Model):
     nombre_echeances = models.PositiveSmallIntegerField(default=1, help_text="Pour le mensuel, ex. 10 (oct. → juil.)")
     premiere_echeance = models.DateField(help_text="Date limite de la première échéance")
     niveaux = models.JSONField(default=list, blank=True, help_text="Niveaux concernés ; vide = tous")
+    obligatoire = models.BooleanField(default=True, help_text="Faux : service à la carte, dû seulement par les inscrits")
     actif = models.BooleanField(default=True)
 
     class Meta:
@@ -47,6 +86,22 @@ class Frais(models.Model):
 
     def concerne(self, classe):
         return not self.niveaux or classe.niveau in self.niveaux
+
+
+class Souscription(models.Model):
+    """Un élève inscrit à un service à la carte (transport, cantine…) pour l'année."""
+
+    inscription = models.ForeignKey(Inscription, on_delete=models.PROTECT, related_name="souscriptions")
+    frais = models.ForeignKey(Frais, on_delete=models.PROTECT, related_name="souscriptions")
+    debut = models.DateField()
+    fin = models.DateField(null=True, blank=True, help_text="Date de désinscription")
+    par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-debut"]
+        constraints = [models.UniqueConstraint(fields=["inscription", "frais"], condition=Q(fin__isnull=True),
+                                               name="une_souscription_en_cours")]
 
 
 class EcheanceQuerySet(models.QuerySet):
@@ -76,6 +131,7 @@ class Echeance(models.Model):
 class Paiement(models.Model):
     class Moyen(models.TextChoices):
         ESPECES = "especes", "Espèces"
+        PORTEFEUILLE = "portefeuille", "Porte-monnaie de la carte"
         WAVE = "wave", "Wave"
         ORANGE_MONEY = "orange_money", "Orange Money"
         FREE_MONEY = "free_money", "Free Money"

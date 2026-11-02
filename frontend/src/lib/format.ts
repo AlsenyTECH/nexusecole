@@ -20,6 +20,7 @@ export const dateHeure = (iso: string | null | undefined) =>
 export const aujourdhui = () => new Date().toLocaleDateString("sv-SE"); // AAAA-MM-JJ, heure locale
 
 export const MOYENS: Record<string, string> = {
+  portefeuille: "Porte-monnaie de la carte",
   especes: "Espèces", wave: "Wave", orange_money: "Orange Money", free_money: "Free Money",
   virement: "Virement", cheque: "Chèque",
 };
@@ -30,5 +31,10 @@ export const ROLES: Record<string, string> = {
 };
 
 export const CATEGORIES_FRAIS: Record<string, string> = {
-  inscription: "Inscription", scolarite: "Scolarité", tenue: "Tenue", assurance: "Assurance", ape: "APE", autre: "Autre",
+  inscription: "Inscription", scolarite: "Scolarité (mensualités)", transport: "Transport scolaire", cantine: "Cantine",
+  etudes: "Études surveillées / renfort", garderie: "Garderie", club: "Activités périscolaires / clubs", tenue: "Tenue / uniforme",
+  fournitures: "Fournitures / manuels", assurance: "Assurance", ape: "Cotisation APE", examen: "Frais d'examen",
+  sortie: "Sortie pédagogique", medical: "Visite médicale", carte: "Carte scolaire (remplacement)", autre: "Autre",
 };
+/** Catégories proposées par défaut comme services à la carte (l'école décide). */
+export const CATEGORIES_SERVICES = ["transport", "cantine", "etudes", "garderie", "club", "sortie"];

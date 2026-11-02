@@ -21,12 +21,13 @@ FORFAITS_PAR_DEFAUT = [
     },
     {
         "code": "standard", "nom": "Standard", "prix_mensuel": 50_000, "max_eleves": 600, "quota_sms_mensuel": 1000,
-        "modules": [Module.SCOLARITE, Module.FRAIS, Module.NOTES, Module.ABSENCES, Module.PARENTS, Module.SMS],
+        "modules": [Module.SCOLARITE, Module.FRAIS, Module.NOTES, Module.ABSENCES, Module.PARENTS, Module.SMS,
+                    Module.CARTE, Module.ACTIVITES],
     },
     {
         "code": "premium", "nom": "Premium", "prix_mensuel": 100_000, "max_eleves": None, "quota_sms_mensuel": 3000,
         "modules": [Module.SCOLARITE, Module.FRAIS, Module.NOTES, Module.ABSENCES, Module.PARENTS, Module.SMS,
-                    Module.PAIEMENT_MOBILE],
+                    Module.CARTE, Module.ACTIVITES, Module.PAIEMENT_MOBILE],
     },
 ]
 

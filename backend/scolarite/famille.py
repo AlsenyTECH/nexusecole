@@ -66,7 +66,8 @@ class EnfantRubriqueView(BaseFamille):
     """GET /api/famille/enfants/<id>/<rubrique> : notes, a-venir, bulletins, emploi-du-temps, scolarite, absences."""
 
     MODULES = {"notes": Module.NOTES, "a-venir": Module.NOTES, "bulletins": Module.NOTES,
-               "emploi-du-temps": Module.NOTES, "scolarite": Module.FRAIS, "absences": Module.ABSENCES}
+               "emploi-du-temps": Module.NOTES, "scolarite": Module.FRAIS, "absences": Module.ABSENCES,
+               "porte-monnaie": Module.CARTE, "activites": Module.ACTIVITES}
 
     def get(self, request, pk, rubrique):
         if rubrique not in self.MODULES:
@@ -74,10 +75,47 @@ class EnfantRubriqueView(BaseFamille):
         if not request.tenant.a_module(self.MODULES[rubrique]):
             raise PermissionDenied("Ce module n'est pas inclus dans le forfait de l'école.")
         eleve = self.eleve(pk)
+        if rubrique == "porte-monnaie":  # la carte ne dépend pas de l'inscription
+            return Response(self.porte_monnaie(eleve))
         insc = inscription_courante(eleve)
         if insc is None:
             return Response(None)
         return Response(getattr(self, rubrique.replace("-", "_"))(insc))
+
+    def porte_monnaie(self, eleve):
+        from carte import paiement_mobile, services as cartes
+        from carte.models import DemandeRecharge
+
+        p, carte = cartes.portefeuille_de(eleve), cartes.carte_de(eleve)
+        return {
+            "solde": p.solde, "bloque": p.bloque, "plafond_journalier": p.plafond_journalier,
+            "plafond_effectif": cartes.plafond(p), "depense_aujourdhui": cartes.depenses_du_jour(p),
+            # Carte virtuelle : le même QR que la carte imprimée (utile si elle est oubliée)
+            "carte": {"numero": carte.numero, "active": carte.active, "qr": cartes.qr_carte(carte) if carte.active else None},
+            "recharge_en_ligne": self.request.tenant.a_module(Module.PAIEMENT_MOBILE) and paiement_mobile.simulation_active(),
+            "operateurs": paiement_mobile.OPERATEURS,
+            "mouvements": [{"id": m.pk, "type": m.type, "libelle": m.libelle, "montant": m.montant, "solde_apres": m.solde_apres,
+                            "le": m.le} for m in p.mouvements.all()[:40]],
+            "en_attente": [{"reference": d.reference, "montant": d.montant, "operateur": d.operateur, "cree_le": d.cree_le}
+                           for d in p.demandes.filter(statut=DemandeRecharge.Statut.EN_ATTENTE)[:5]],
+        }
+
+    def activites(self, insc):
+        from activites.models import Activite, Ticket
+
+        tickets = {t.activite_id: t for t in Ticket.objects.filter(eleve=insc.eleve).exclude(statut=Ticket.Statut.ANNULE)}
+        resultat = []
+        for a in Activite.objects.filter(date__gte=timezone.localdate()).order_by("date", "heure"):
+            if not a.concerne(insc.classe) and a.pk not in tickets:
+                continue
+            t = tickets.get(a.pk)
+            pris = a.tickets.exclude(statut=Ticket.Statut.ANNULE).count()
+            resultat.append({"id": a.pk, "titre": a.titre, "description": a.description, "date": a.date, "heure": a.heure,
+                             "lieu": a.lieu, "prix": a.prix, "achetable": a.ouverte and a.vente_en_ligne and t is None and
+                             (a.places is None or pris < a.places),
+                             "complet": a.places is not None and pris >= a.places,
+                             "ticket": {"code": t.code, "statut": t.statut} if t else None})
+        return resultat
 
     def notes(self, insc):
         """Notes validées par période et matière, avec les moyennes provisoires (sans rang avant le conseil)."""
@@ -132,8 +170,13 @@ class EnfantRubriqueView(BaseFamille):
         from finances import services
         from finances.models import Paiement
 
+        from finances.models import Souscription
+
         s = services.situation(insc)
         return {
+            "services": [{"libelle": x.frais.libelle, "depuis": x.debut, "montant": x.frais.montant, "periodicite": x.frais.periodicite}
+                         for x in Souscription.objects.filter(inscription=insc, fin__isnull=True).select_related("frais")],
+            "payer_par_porte_monnaie": self.request.tenant.a_module(Module.CARTE),
             "total": s["total"], "paye": s["paye"], "reste": s["reste"], "en_retard": s["en_retard"],
             "echeances": [{"id": e.pk, "libelle": e.libelle, "montant": e.montant, "date_limite": e.date_limite,
                            "paye": e.paye, "reste": e.reste} for e in s["echeances"]],
@@ -171,3 +214,98 @@ class RecuFamilleView(BaseFamille):
                               pk=pk, inscription__eleve__in=eleves_suivis(request.user))
         return Response(donnees_recu(p, request.tenant))
 
+
+
+# --------------------------------------------------------------------------- #
+# Actions du parent : recharger, régler le porte-monnaie, acheter un ticket, payer une échéance
+# --------------------------------------------------------------------------- #
+def _metier(fn):
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from rest_framework.exceptions import ValidationError
+
+    try:
+        return fn()
+    except DjangoValidationError as e:
+        raise ValidationError({"detail": e.messages[0] if e.messages else str(e)})
+
+
+def _module(request, module):
+    if not request.tenant.a_module(module):
+        raise PermissionDenied("Ce module n'est pas inclus dans le forfait de l'école.")
+
+
+class RechargeFamilleView(BaseFamille):
+    """POST {montant, operateur} → {url} : page de paiement de l'opérateur (ou du simulateur)."""
+
+    def post(self, request, pk):
+        from rest_framework.exceptions import APIException
+
+        from carte import paiement_mobile
+
+        _module(request, Module.CARTE)
+        _module(request, Module.PAIEMENT_MOBILE)
+        eleve = self.eleve(pk)
+        try:
+            montant = int(request.data.get("montant"))
+        except (TypeError, ValueError):
+            montant = 0
+        try:
+            demande, url = _metier(lambda: paiement_mobile.demander_recharge(eleve, montant, request.data.get("operateur"), request.user))
+        except paiement_mobile.PaiementMobileIndisponible as e:
+            erreur = APIException(str(e))
+            erreur.status_code = 503
+            raise erreur
+        return Response({"reference": demande.reference, "url": url}, status=201)
+
+
+class ReglagesPorteMonnaieView(BaseFamille):
+    """PATCH {plafond_journalier, bloque} : le parent limite les dépenses ou bloque la carte (perte)."""
+
+    def patch(self, request, pk):
+        from carte import services as cartes
+
+        _module(request, Module.CARTE)
+        p = cartes.portefeuille_de(self.eleve(pk))
+        if "plafond_journalier" in request.data:
+            v = request.data["plafond_journalier"]
+            p.plafond_journalier = None if v in (None, "") else max(0, int(v))
+        if "bloque" in request.data:
+            p.bloque = bool(request.data["bloque"])
+        p.save(update_fields=["plafond_journalier", "bloque"])
+        return Response({"plafond_journalier": p.plafond_journalier, "bloque": p.bloque})
+
+
+class TicketFamilleView(BaseFamille):
+    """POST {activite} : achète le ticket avec le porte-monnaie de l'élève."""
+
+    def post(self, request, pk):
+        from activites import services as billetterie
+        from activites.models import Activite
+        from rest_framework.exceptions import ValidationError
+
+        _module(request, Module.ACTIVITES)
+        eleve = self.eleve(pk)
+        activite = get_object_or_404(Activite, pk=request.data.get("activite"))
+        if not activite.vente_en_ligne:
+            raise ValidationError({"detail": "Les tickets de cette activité se vendent au guichet."})
+        t = _metier(lambda: billetterie.vendre(activite, par=request.user, eleve=eleve, moyen="portefeuille"))
+        return Response({"code": t.code, "statut": t.statut}, status=201)
+
+
+class PayerEcheanceView(BaseFamille):
+    """POST : règle le reste d'une échéance avec le porte-monnaie (le reçu est émis comme au guichet)."""
+
+    def post(self, request, pk, echeance):
+        from finances import services
+        from finances.models import Echeance, Paiement
+
+        _module(request, Module.CARTE)
+        eleve = self.eleve(pk)
+        e = get_object_or_404(Echeance.objects.avec_soldes(), pk=echeance, inscription__eleve=eleve)
+        if e.reste <= 0:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"detail": "Cette échéance est déjà réglée."})
+        p = _metier(lambda: services.encaisser(e.inscription, montant=e.reste, moyen=Paiement.Moyen.PORTEFEUILLE,
+                                               encaisse_par=request.user, echeances=[e.pk],
+                                               observation="Payé par le parent depuis l'application"))
+        return Response({"paiement": p.pk, "numero_recu": p.numero_recu}, status=201)

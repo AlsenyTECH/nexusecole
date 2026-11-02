@@ -81,6 +81,13 @@ export async function api<T = unknown>(chemin: string, init: RequestInit = {}): 
   return donnees as T;
 }
 
+/** Fichier binaire authentifié (photo d'élève) ; null s'il n'existe pas. */
+export async function apiBlob(chemin: string): Promise<Blob | null> {
+  let r = await brut(chemin);
+  if (r.status === 401 && jetons && (await rafraichir())) r = await brut(chemin);
+  return r.ok ? r.blob() : null;
+}
+
 const envoi = (methode: string) => <T = unknown>(chemin: string, corps?: unknown) =>
   api<T>(chemin, { method: methode, body: corps === undefined ? undefined : JSON.stringify(corps) });
 

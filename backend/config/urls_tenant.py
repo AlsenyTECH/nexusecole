@@ -8,8 +8,14 @@ from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, Conseil
                              EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
                              ReouvertureView, ResultatsView, SurveillanceViewSet, VerificationView)
 from pedagogie.equipe import CreneauViewSet, EnseignantViewSet
-from scolarite.famille import BulletinFamilleView, EnfantRubriqueView, EnfantsView, RecuFamilleView
-from finances.views import CaisseView, FraisViewSet, ImpayesView, PaiementViewSet, SituationView
+from activites.views import ActiviteViewSet
+from carte.views import (CarteEleveView, CartesView, ControleView, GrandLivreView, LectureCarteView, ParametresCarteView,
+                         PassageViewSet, PhotoView, PointDeVenteViewSet, ArticleViewSet, PortefeuilleView,
+                         RechargeGuichetView, SimulateurView, VenteViewSet)
+from scolarite.famille import (BulletinFamilleView, EnfantRubriqueView, EnfantsView, PayerEcheanceView, RechargeFamilleView,
+                               RecuFamilleView, ReglagesPorteMonnaieView, TicketFamilleView)
+from finances.views import (CaisseView, CaisseViewSet, FraisViewSet, ImpayesView, PaiementViewSet, RapportCaissesView,
+                            SituationView, SouscriptionViewSet)
 from scolarite.views import (AnneeScolaireViewSet, ClasseViewSet, ConfigEcoleView, EleveViewSet, InscriptionViewSet,
                               LienResponsableViewSet, ResponsableViewSet, TableauDeBordView)
 
@@ -24,6 +30,13 @@ router.register("enseignants", EnseignantViewSet, basename="enseignant")
 router.register("responsables", ResponsableViewSet)
 router.register("liens-responsables", LienResponsableViewSet)
 router.register("creneaux", CreneauViewSet)
+router.register("souscriptions", SouscriptionViewSet)
+router.register("caisses", CaisseViewSet)
+router.register("points-de-vente", PointDeVenteViewSet)
+router.register("articles", ArticleViewSet)
+router.register("ventes", VenteViewSet)
+router.register("passages", PassageViewSet)
+router.register("activites", ActiviteViewSet, basename="activite")
 router.register("frais", FraisViewSet)
 router.register("paiements", PaiementViewSet)
 router.register("periodes", PeriodeViewSet)
@@ -52,7 +65,22 @@ urlpatterns = [
     path("api/conseils/rouvrir", ReouvertureView.as_view()),
     path("api/verifier/<str:code>", VerificationView.as_view()),
     path("api/famille/enfants", EnfantsView.as_view()),
+    path("api/famille/enfants/<int:pk>/recharges", RechargeFamilleView.as_view()),
+    path("api/famille/enfants/<int:pk>/reglages", ReglagesPorteMonnaieView.as_view()),
+    path("api/famille/enfants/<int:pk>/tickets", TicketFamilleView.as_view()),
+    path("api/famille/enfants/<int:pk>/echeances/<int:echeance>/payer", PayerEcheanceView.as_view()),
     path("api/famille/enfants/<int:pk>/<slug:rubrique>", EnfantRubriqueView.as_view()),
+    path("api/eleves/<int:pk>/photo", PhotoView.as_view()),
+    path("api/eleves/<int:pk>/carte", CarteEleveView.as_view()),
+    path("api/eleves/<int:pk>/porte-monnaie", PortefeuilleView.as_view()),
+    path("api/eleves/<int:pk>/recharger", RechargeGuichetView.as_view()),
+    path("api/cartes", CartesView.as_view()),
+    path("api/cartes/lire", LectureCarteView.as_view()),
+    path("api/cartes/parametres", ParametresCarteView.as_view()),
+    path("api/controle", ControleView.as_view()),
+    path("api/porte-monnaie/grand-livre", GrandLivreView.as_view()),
+    path("api/finances/caisses", RapportCaissesView.as_view()),
+    path("api/paiements-mobiles/simulateur/<str:reference>", SimulateurView.as_view()),
     path("api/famille/bulletins/<int:pk>", BulletinFamilleView.as_view()),
     path("api/famille/recus/<int:pk>", RecuFamilleView.as_view()),
     path("api/", include(router.urls)),

@@ -18,6 +18,8 @@ services:
         sync: false
       - key: DONNEES_DEMO
         value: "true"          # crée le « Lycée Démo » rempli ; mettre false pour un espace vide
+      - key: PAIEMENT_MOBILE_SIMULATION
+        value: lycee_demo      # recharge Wave/OM simulée, SEULEMENT pour l'école de démo (crédite sans argent réel)
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SIGNING_KEY

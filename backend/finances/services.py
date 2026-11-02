@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from .models import CompteurRecu, Echeance, Frais, Imputation, Paiement
+from .models import CompteurRecu, Echeance, Frais, Imputation, Paiement, Souscription
 
 MOIS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
         "septembre", "octobre", "novembre", "décembre"]
@@ -30,22 +30,66 @@ def generer_echeances(inscription):
     """Crée les échéances d'une inscription depuis la grille. Idempotent : un frais déjà généré est ignoré."""
     deja = set(inscription.echeances.exclude(frais=None).values_list("frais_id", flat=True))
     a_creer = []
-    for frais in Frais.objects.filter(annee=inscription.annee, actif=True):
+    for frais in Frais.objects.filter(annee=inscription.annee, actif=True, obligatoire=True):
         if frais.pk in deja or not frais.concerne(inscription.classe):
             continue
-        montant = montant_apres_reduction(frais, inscription)
-        if montant == 0:
-            continue
-        if frais.periodicite == Frais.Periodicite.MENSUEL:
-            for i in range(frais.nombre_echeances):
-                d = ajouter_mois(frais.premiere_echeance, i)
-                a_creer.append(Echeance(inscription=inscription, frais=frais, montant=montant, date_limite=d,
-                                        libelle=f"{frais.libelle} – {MOIS[d.month]} {d.year}"))
-        else:
-            a_creer.append(Echeance(inscription=inscription, frais=frais, montant=montant,
-                                    date_limite=frais.premiere_echeance, libelle=frais.libelle))
+        a_creer += _echeances(inscription, frais)
     Echeance.objects.bulk_create(a_creer)
     return len(a_creer)
+
+
+def _echeances(inscription, frais, depuis=None):
+    """Échéances d'un frais pour une inscription ; `depuis` : seulement les mois à partir de cette date."""
+    montant = montant_apres_reduction(frais, inscription)
+    if montant == 0:
+        return []
+    if frais.periodicite == Frais.Periodicite.MENSUEL:
+        dates = [ajouter_mois(frais.premiere_echeance, i) for i in range(frais.nombre_echeances)]
+        if depuis:
+            dates = [d for d in dates if (d.year, d.month) >= (depuis.year, depuis.month)]
+        return [Echeance(inscription=inscription, frais=frais, montant=montant, date_limite=d,
+                         libelle=f"{frais.libelle} – {MOIS[d.month]} {d.year}") for d in dates]
+    limite = max(frais.premiere_echeance, depuis) if depuis else frais.premiere_echeance
+    return [Echeance(inscription=inscription, frais=frais, montant=montant, date_limite=limite, libelle=frais.libelle)]
+
+
+# --------------------------------------------------------------------------- #
+# Services à la carte
+# --------------------------------------------------------------------------- #
+@transaction.atomic
+def souscrire(inscription, frais, *, par, depuis=None):
+    """Inscrit l'élève à un service : échéances du mois en cours jusqu'à la fin (pas de rattrapage des mois passés)."""
+    depuis = depuis or timezone.localdate()
+    if frais.obligatoire:
+        raise ValidationError("Ce frais est obligatoire : il est déjà dû par tous les élèves concernés.")
+    if not frais.actif or frais.annee_id != inscription.annee_id:
+        raise ValidationError("Ce service n'est pas proposé pour l'année de l'inscription.")
+    if not frais.concerne(inscription.classe):
+        raise ValidationError("Ce service n'est pas proposé pour le niveau de l'élève.")
+    if Souscription.objects.filter(inscription=inscription, frais=frais, fin__isnull=True).exists():
+        raise ValidationError("L'élève est déjà inscrit à ce service.")
+    souscription = Souscription.objects.create(inscription=inscription, frais=frais, debut=depuis, par=par)
+    # Une souscription précédente (désinscrit puis réinscrit) a peut-être laissé des échéances déjà payées
+    existantes = set(inscription.echeances.filter(frais=frais).values_list("date_limite", flat=True))
+    Echeance.objects.bulk_create([e for e in _echeances(inscription, frais, depuis) if e.date_limite not in existantes])
+    return souscription
+
+
+@transaction.atomic
+def desinscrire(souscription, *, fin=None):
+    """
+    Arrête un service : les échéances à venir qui n'ont reçu aucun paiement sont retirées ;
+    celles déjà échues ou (même partiellement) payées restent dues / acquises.
+    """
+    if souscription.fin:
+        raise ValidationError("Cette souscription est déjà arrêtée.")
+    fin = fin or timezone.localdate()
+    souscription.fin = fin
+    souscription.save(update_fields=["fin"])
+    a_retirer = souscription.inscription.echeances.filter(frais=souscription.frais, date_limite__gt=fin, imputations__isnull=True)
+    n = a_retirer.count()
+    a_retirer.delete()
+    return n
 
 
 def _prochain_numero_recu():
@@ -94,6 +138,11 @@ def encaisser(inscription, *, montant, moyen, encaisse_par, reference="", observ
         if restant == 0:
             break
     Imputation.objects.bulk_create(imputations)
+    if moyen == Paiement.Moyen.PORTEFEUILLE:
+        from carte.services import debiter
+
+        debiter(inscription.eleve, montant, type_="frais", libelle=f"Frais scolaires – reçu {paiement.numero_recu}",
+                reference=paiement.numero_recu, par=encaisse_par, achat=False)
     return paiement
 
 
@@ -109,6 +158,11 @@ def annuler_paiement(paiement, *, motif, par):
     paiement.annule_par = par
     paiement.annule_le = timezone.now()
     paiement.save(update_fields=["annule", "motif_annulation", "annule_par", "annule_le"])
+    if paiement.moyen == Paiement.Moyen.PORTEFEUILLE:  # l'argent revient sur la carte
+        from carte.services import crediter
+
+        crediter(paiement.inscription.eleve, paiement.montant, type_="remboursement",
+                 libelle=f"Annulation du reçu {paiement.numero_recu}", reference=paiement.numero_recu, par=par)
     return paiement
 
 

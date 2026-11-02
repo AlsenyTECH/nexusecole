@@ -188,3 +188,67 @@ def remplir_familles(ecole):
             Evaluation.objects.create(cours=cours, periode=t1, type="composition", titre="Composition du 1er trimestre",
                                       date=timezone.localdate() + timedelta(days=10), sur=20, creee_par=cours.enseignant)
         return True
+
+
+def remplir_carte(ecole):
+    """Services à la carte, points de vente, recharges, ventes et activités de démonstration (idempotent)."""
+    from activites import services as billetterie
+    from activites.models import Activite
+    from carte import services as cartes
+    from carte.models import Article, Mouvement, PointDeVente, Vente
+    from finances.models import Caisse
+    from finances.services import souscrire
+
+    with schema_context(ecole.schema_name):
+        annee = AnneeScolaire.objects.filter(active=True).first()
+        if not annee or PointDeVente.objects.exists():
+            return False
+        debut = date(annee.debut.year, 10, 5)
+        transport = Frais.objects.create(annee=annee, libelle="Transport – zone 1", categorie="transport", montant=10_000,
+                                         periodicite="mensuel", nombre_echeances=10, premiere_echeance=debut, obligatoire=False)
+        Frais.objects.create(annee=annee, libelle="Transport – zone 2", categorie="transport", montant=15_000,
+                             periodicite="mensuel", nombre_echeances=10, premiere_echeance=debut, obligatoire=False)
+        cantine = Frais.objects.create(annee=annee, libelle="Cantine (forfait mensuel)", categorie="cantine", montant=12_500,
+                                       periodicite="mensuel", nombre_echeances=10, premiere_echeance=debut, obligatoire=False)
+        Frais.objects.create(annee=annee, libelle="Études surveillées", categorie="etudes", montant=7_500,
+                             periodicite="mensuel", nombre_echeances=9, premiere_echeance=debut, obligatoire=False,
+                             niveaux=["3e"])
+        directeur = Utilisateur.objects.filter(role=Role.DIRECTEUR).first()
+        caissier = Utilisateur.objects.filter(email="caisse@lycee-demo.sn").first() or directeur
+        inscriptions = list(Inscription.objects.filter(annee=annee).select_related("eleve", "classe").order_by("eleve__matricule"))
+        for i, insc in enumerate(inscriptions):
+            if i % 3 == 0:
+                souscrire(insc, transport, par=directeur)
+            if i % 2 == 0:
+                souscrire(insc, cantine, par=directeur)
+
+        ecole_caisse = Caisse.de_l_ecole()
+        pdv = PointDeVente.objects.create(nom="Cantine", caisse=ecole_caisse)
+        repas = Article.objects.create(point_de_vente=pdv, nom="Repas du midi", prix=500)
+        Article.objects.create(point_de_vente=pdv, nom="Petit-déjeuner", prix=300)
+        jus = Article.objects.create(point_de_vente=pdv, nom="Jus de bissap", prix=200)
+        boutique = PointDeVente.objects.create(nom="Boutique (uniformes)", caisse=ecole_caisse)
+        for nom, prix in (("Chemise de l'école", 4_000), ("Pantalon / jupe", 5_000), ("Tenue de sport", 6_000), ("Cravate", 1_500)):
+            Article.objects.create(point_de_vente=boutique, nom=nom, prix=prix)
+
+        # Recharges et quelques achats à la cantine
+        for i, insc in enumerate(inscriptions[:10]):
+            cartes.crediter(insc.eleve, [5_000, 2_500, 10_000][i % 3], libelle="Recharge au guichet", par=caissier,
+                            moyen=["especes", "wave", "orange_money"][i % 3], reference="" if i % 3 == 0 else f"TX-DEMO-{i:03d}")
+            if i % 2 == 0:
+                m = cartes.debiter(insc.eleve, repas.prix + jus.prix, type_=Mouvement.Type.ACHAT,
+                                   libelle="Cantine : Repas du midi, Jus de bissap", reference=f"pdv-{pdv.pk}", par=caissier, caisse=ecole_caisse)
+                Vente.objects.create(point_de_vente=pdv, eleve=insc.eleve, montant=m.montant * -1, mouvement=m, par=caissier,
+                                     lignes=[{"article": repas.pk, "nom": repas.nom, "prix": repas.prix, "quantite": 1},
+                                             {"article": jus.pk, "nom": jus.nom, "prix": jus.prix, "quantite": 1}])
+
+        # Activités : recettes au foyer des élèves (hors comptabilité de l'école)
+        foyer = Caisse.objects.filter(code="foyer").first() or Caisse.objects.create(nom="Foyer des élèves", comptabilisee=False, code="foyer")
+        soiree = Activite.objects.create(titre="Soirée culturelle de fin de trimestre", date=timezone.localdate() + timedelta(days=12),
+                                         lieu="Cour de l'école", prix=1_000, places=200, caisse=foyer, cree_par=directeur,
+                                         description="Théâtre, danse et chants préparés par les élèves.")
+        Activite.objects.create(titre="Tournoi de football inter-classes", date=timezone.localdate() + timedelta(days=5),
+                                lieu="Terrain municipal", prix=500, caisse=foyer, cree_par=directeur, niveaux=["4e", "3e"])
+        for insc in inscriptions[:4]:
+            billetterie.vendre(soiree, par=caissier, eleve=insc.eleve, moyen="portefeuille")
+        return True

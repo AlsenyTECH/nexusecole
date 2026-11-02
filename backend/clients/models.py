@@ -14,6 +14,8 @@ class Module(models.TextChoices):
     PARENTS = "parents", "Espace parents"
     SMS = "sms", "Notifications SMS/WhatsApp"
     PAIEMENT_MOBILE = "paiement_mobile", "Paiement Wave / Orange Money"
+    CARTE = "carte", "Carte scolaire, porte-monnaie et contrôle d'accès"
+    ACTIVITES = "activites", "Activités et billetterie"
     CANTINE = "cantine", "Cantine"
     TRANSPORT = "transport", "Transport"
     PAIE = "paie", "Paie du personnel"

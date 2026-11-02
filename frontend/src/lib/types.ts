@@ -43,7 +43,7 @@ export type Paiement = {
 };
 export type Frais = {
   id: number; annee: number; libelle: string; categorie: string; montant: number; periodicite: "unique" | "mensuel";
-  nombre_echeances: number; premiere_echeance: string; niveaux: string[]; actif: boolean;
+  nombre_echeances: number; premiere_echeance: string; niveaux: string[]; obligatoire: boolean; actif: boolean;
 };
 export type Personnel = {
   id: number; email: string; prenom: string; nom: string; telephone: string; role: string; role_ecole: number | null; role_nom: string;

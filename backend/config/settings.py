@@ -34,6 +34,9 @@ PUBLIC_DOMAIN = os.environ.get("PUBLIC_DOMAIN", f"admin.{BASE_DOMAIN}")
 ECOLE_PAR_EN_TETE = env_bool("ECOLE_PAR_EN_TETE", False)
 # Dossier de l'interface compilée, servie par Django quand aucun serveur web n'est devant (Render)
 FRONTEND_DIST = os.environ.get("FRONTEND_DIST", "")
+# Recharge en ligne simulée (démonstration uniquement : crédite sans argent réel). Jamais pour une vraie école.
+# Vide : désactivée ; « lycee_demo » : seulement pour ces écoles (schémas, séparés par des virgules) ; « true » : partout (dev).
+PAIEMENT_MOBILE_SIMULATION = os.environ.get("PAIEMENT_MOBILE_SIMULATION", "")
 RESERVED_SUBDOMAINS = {"admin", "www", "api", "public", "app", "static", "mail"}
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", f".{BASE_DOMAIN},{BASE_DOMAIN},testserver")
@@ -61,6 +64,8 @@ TENANT_APPS = [
     "scolarite",
     "finances",
     "pedagogie",
+    "carte",
+    "activites",
 ]
 
 INSTALLED_APPS = SHARED_APPS + [app for app in TENANT_APPS if app not in SHARED_APPS]
