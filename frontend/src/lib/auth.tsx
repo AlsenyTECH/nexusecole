@@ -8,6 +8,8 @@ type Auth = {
   chargement: boolean;
   connecter: (email: string, mdp: string) => Promise<void>;
   deconnecter: () => void;
+  /** Relit le compte connecté (après « Mon compte »). */
+  recharger: () => Promise<void>;
   /** Le serveur reste juge : ceci ne sert qu'à masquer ce qu'on ne peut pas faire. */
   peut: (permission: string) => boolean;
 };
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const peut = (p: string) => !!moi?.permissions?.includes(p);
 
-  return <Contexte.Provider value={{ moi, chargement, connecter, deconnecter, peut }}>{children}</Contexte.Provider>;
+  return <Contexte.Provider value={{ moi, chargement, connecter, deconnecter, peut, recharger: charger }}>{children}</Contexte.Provider>;
 }
 
 export function useAuth() {

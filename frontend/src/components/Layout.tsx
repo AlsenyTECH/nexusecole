@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LogOut, Menu, Moon, Sun, X, type LucideIcon } from "lucide-react";
+import { LogOut, Menu, Moon, Sun, UserCog, X, type LucideIcon } from "lucide-react";
+import { MonCompte } from "@/components/MonCompte";
 import { Avatar, initialesEcole } from "@/components/design";
 import { choisirMode, useSombre } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ export function Layout({ groupes, bas, marque, utilisateur, deconnecter, bandeau
   const sombre = useSombre();
   const libelleMode = sombre ? "Passer en mode clair" : "Passer en mode sombre";
   const [menu, setMenu] = useState(false);
+  const [compte, setCompte] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => { setMenu(false); window.scrollTo(0, 0); }, [pathname]);
 
@@ -95,6 +97,10 @@ export function Layout({ groupes, bas, marque, utilisateur, deconnecter, bandeau
             className="rounded-lg p-2 text-sidebar-muted hover:bg-white/10 hover:text-white">
             {sombre ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
+          <button onClick={() => setCompte(true)} title="Mon compte" aria-label="Mon compte"
+            className="rounded-lg p-2 text-sidebar-muted hover:bg-white/10 hover:text-white">
+            <UserCog className="size-4" />
+          </button>
           <button onClick={deconnecter} title="Se déconnecter" aria-label="Se déconnecter"
             className="rounded-lg p-2 text-sidebar-muted hover:bg-white/10 hover:text-white">
             <LogOut className="size-4" />
@@ -132,6 +138,9 @@ export function Layout({ groupes, bas, marque, utilisateur, deconnecter, bandeau
               <button onClick={() => choisirMode(sombre ? "clair" : "sombre")} className="flex w-full items-center gap-3 rounded-lg border-t border-border px-3 py-2.5 text-sm font-medium hover:bg-muted">
                 {sombre ? <Sun className="size-[18px] text-muted-foreground" /> : <Moon className="size-[18px] text-muted-foreground" />} {libelleMode}
               </button>
+              <button onClick={() => { setMenu(false); setCompte(true); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted">
+                <UserCog className="size-[18px] text-muted-foreground" /> Mon compte
+              </button>
               <button onClick={deconnecter} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive hover:bg-muted">
                 <LogOut className="size-[18px]" /> Se déconnecter
               </button>
@@ -166,6 +175,7 @@ export function Layout({ groupes, bas, marque, utilisateur, deconnecter, bandeau
           </div>
         </nav>
       ) : null}
+      <MonCompte ouvert={compte} fermer={() => setCompte(false)} />
     </div>
   );
 }

@@ -28,7 +28,52 @@ class UtilisateurSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "prenom", "nom", "telephone", "role"]
 
 
+class MonCompteSerializer(serializers.Serializer):
+    """Modifier son propre compte : identifiant, nom, téléphone, mot de passe (le mot de passe actuel est exigé)."""
+
+    email = serializers.CharField(required=False, max_length=254)
+    prenom = serializers.CharField(required=False, allow_blank=True, max_length=80)
+    nom = serializers.CharField(required=False, allow_blank=True, max_length=80)
+    telephone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    mot_de_passe_actuel = serializers.CharField(write_only=True)
+    nouveau_mot_de_passe = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        import re
+
+        user = self.context["request"].user
+        if not user.check_password(attrs["mot_de_passe_actuel"]):
+            raise ValidationError({"mot_de_passe_actuel": "Mot de passe actuel incorrect."})
+        if "email" in attrs:
+            email = attrs["email"].strip().lower()
+            # Identifiant de connexion : une forme nom@domaine suffit (pas forcément une adresse qui reçoit du courrier)
+            if not re.fullmatch(r"[^@\s]+@[^@\s]+", email):
+                raise ValidationError({"email": "Identifiant invalide : il doit avoir la forme nom@domaine."})
+            if Utilisateur.objects.filter(email=email).exclude(pk=user.pk).exists():
+                raise ValidationError({"email": "Cet identifiant est déjà utilisé par un autre compte."})
+            attrs["email"] = email
+        if attrs.get("nouveau_mot_de_passe"):
+            validate_password(attrs["nouveau_mot_de_passe"], user)
+        return attrs
+
+
 class MoiView(APIView):
+    def patch(self, request):
+        s = MonCompteSerializer(data=request.data, context={"request": request})
+        s.is_valid(raise_exception=True)
+        user, d = request.user, s.validated_data
+        for champ in ("email", "prenom", "nom", "telephone"):
+            if champ in d:
+                setattr(user, champ, d[champ])
+        if d.get("nouveau_mot_de_passe"):
+            user.set_password(d["nouveau_mot_de_passe"])
+        user.save()
+        if user.role == Role.PARENT and "email" in d:  # parent : garder sa fiche de responsable à jour
+            from scolarite.models import Responsable
+
+            Responsable.objects.filter(utilisateur=user).update(email=user.email)
+        return self.get(request)
+
     def get(self, request):
         data = UtilisateurSerializer(request.user).data
         data["role_nom"] = request.user.role_ecole.nom if request.user.role_ecole_id else request.user.get_role_display()

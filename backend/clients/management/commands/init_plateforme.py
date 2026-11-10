@@ -13,7 +13,7 @@ from django_tenants.utils import schema_context
 
 from clients.models import Domaine, Ecole
 from clients.services import installer_forfaits_par_defaut
-from comptes.models import Utilisateur
+from comptes.models import Role, Utilisateur
 
 
 class Command(BaseCommand):
@@ -35,6 +35,8 @@ class Command(BaseCommand):
         if email:
             password = os.environ.get("SUPERADMIN_PASSWORD") or getpass.getpass("Mot de passe super-admin : ")
             with schema_context("public"):
-                if not Utilisateur.objects.filter(email=email.lower()).exists():
+                # Seulement au tout premier démarrage : un super-admin renommé ensuite (écran « Mon compte »)
+                # ne doit pas être recréé sous l'ancienne adresse à chaque redémarrage.
+                if not Utilisateur.objects.filter(role=Role.SUPERADMIN).exists():
                     Utilisateur.objects.create_superuser(email, password)
                     self.stdout.write(self.style.SUCCESS(f"Super-admin {email} créé"))
