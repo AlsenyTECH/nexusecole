@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, KeyRound, Landmark, Layers, PartyPopper, Presentation, ReceiptText, Repeat, ScanLine, ShieldCheck, Store, UserCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, Banknote, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, GraduationCap, Home, KeyRound, Landmark, Layers, PartyPopper, Presentation, ReceiptText, Repeat, ScanLine, ShieldCheck, Sparkles, Store, UserCheck, UsersRound } from "lucide-react";
 import { AlerteAnnee } from "@/components/AlerteAnnee";
 import { Connexion } from "@/components/Connexion";
 import { Layout, type Groupe } from "@/components/Layout";
@@ -29,6 +29,7 @@ import { Cours } from "@/pages/Cours";
 import { EleveDetail } from "@/pages/EleveDetail";
 import { Eleves } from "@/pages/Eleves";
 import { EmploiDuTemps } from "@/pages/EmploiDuTemps";
+import { GenerateurEDT } from "@/pages/GenerateurEDT";
 import { Enseignants } from "@/pages/Enseignants";
 import { GrilleFrais } from "@/pages/GrilleFrais";
 import { Impayes } from "@/pages/Impayes";
@@ -113,6 +114,7 @@ export function EcoleApp() {
         { vers: "/notes", libelle: "Notes", icone: ClipboardList, visible: notes && (peut("notes.saisir") || peut("notes.saisir_toutes")) },
         { vers: "/appel", libelle: "Appel", icone: UserCheck, visible: absences && peut("absences.saisir") },
         { vers: "/emploi-du-temps", libelle: "Emploi du temps", icone: CalendarDays, visible: notes && peut("eleves.voir") },
+        { vers: "/emploi-du-temps/generateur", libelle: "Générer les emplois du temps", icone: Sparkles, visible: notes && peut("emploi_du_temps.gerer") },
         { vers: "/resultats", libelle: "Résultats et bulletins", icone: FileText, visible: notes && peut("notes.voir") },
         { vers: "/cours", libelle: "Matières et cours", icone: BookOpenCheck, visible: notes && peut("scolarite.parametrer") },
       ],
@@ -172,6 +174,7 @@ export function EcoleApp() {
         <Route path="resultats" element={<Resultats />} />
         <Route path="cours" element={<Cours />} />
         <Route path="emploi-du-temps" element={<EmploiDuTemps />} />
+        <Route path="emploi-du-temps/generateur" element={<GenerateurEDT />} />
         <Route path="enseignants" element={<Enseignants />} />
         <Route path="controle" element={<Controle />} />
         <Route path="fin-annee" element={<FinAnnee />} />

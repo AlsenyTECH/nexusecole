@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
@@ -91,7 +92,7 @@ class PeriodeViewSet(BaseNotes, viewsets.ModelViewSet):
 class MatiereSerializer(serializers.ModelSerializer):
     class Meta:
         model = Matiere
-        fields = ["id", "nom", "code"]
+        fields = ["id", "nom", "code", "lourde", "salle"]
 
 
 class MatiereViewSet(BaseNotes, viewsets.ModelViewSet):
@@ -107,12 +108,26 @@ class CoursSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cours
-        fields = ["id", "classe", "classe_nom", "matiere", "matiere_nom", "coefficient", "enseignant", "enseignant_nom"]
+        fields = ["id", "classe", "classe_nom", "matiere", "matiere_nom", "coefficient", "enseignant", "enseignant_nom",
+                  "volume_horaire", "decoupage"]
 
     def validate_enseignant(self, user):
         if user and user.role not in TYPES_ENSEIGNANTS:
             raise serializers.ValidationError("Ce compte n'est pas un enseignant.")
         return user
+
+    def validate(self, attrs):
+        volume = attrs.get("volume_horaire", getattr(self.instance, "volume_horaire", None))
+        decoupage = (attrs.get("decoupage", getattr(self.instance, "decoupage", "")) or "").replace(" ", "")
+        if decoupage:
+            if not re.fullmatch(r"[1-4](\+[1-4])*", decoupage):
+                raise serializers.ValidationError({"decoupage": "Écrivez les séances en heures, ex. 2+2+1 (4 h au plus chacune)."})
+            if not volume or sum(map(int, decoupage.split("+"))) != volume:
+                raise serializers.ValidationError({"decoupage": f"Les séances doivent totaliser le volume horaire ({volume or 0} h)."})
+        if volume is not None and volume > 20:
+            raise serializers.ValidationError({"volume_horaire": "20 h par semaine au plus."})
+        attrs["decoupage"] = decoupage
+        return attrs
 
 
 class CoursViewSet(BaseNotes, viewsets.ModelViewSet):

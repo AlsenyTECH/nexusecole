@@ -195,6 +195,10 @@ Paiement annuel (10 mois) : 2 mois offerts.
 - [x] **Rentrée scolaire** : années en préparation / active / clôturée, préparation de l'année suivante (classes, frais,
   matières, trimestres reconduits ; affectations des enseignants remises à zéro), décisions de fin d'année et
   réinscriptions proposées à valider, blocage de n'importe quel compte (suppression seulement sans historique)
+- [x] **Générateur d'emplois du temps** : grille de l'école, heures et découpage par matière, salles spécialisées,
+  disponibilités (proposées par le professeur, validées par la direction), diagnostic, 3 propositions calculées par
+  OR-Tools CP-SAT, comparaison par classe ou par professeur, publication — voir
+  [docs/etude-emploi-du-temps.md](docs/etude-emploi-du-temps.md)
 - [ ] **Phase 2c** : recharge Wave / Orange Money réelle (comptes marchands), comptes élèves, SMS/WhatsApp
 - [ ] **Phase 3 – Pilotes** : 3 à 5 écoles
 - [ ] **Phase 4 – Commercial** : facturation automatique, relances, instance dédiée, modules payants

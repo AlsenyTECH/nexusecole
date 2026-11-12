@@ -47,9 +47,25 @@ class Periode(models.Model):
         return f"{self.nom} {self.annee}"
 
 
+class SalleSpecialisee(models.Model):
+    """Salle partagée entre les classes (labo, salle informatique, terrain) : `nombre` salles identiques."""
+
+    nom = models.CharField(max_length=60, unique=True)
+    nombre = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        ordering = ["nom"]
+
+    def __str__(self):
+        return self.nom
+
+
 class Matiere(models.Model):
     nom = models.CharField(max_length=60, unique=True)
     code = models.CharField(max_length=10, blank=True)
+    lourde = models.BooleanField(default=False, help_text="Placée de préférence le matin par le générateur")
+    salle = models.ForeignKey(SalleSpecialisee, null=True, blank=True, on_delete=models.SET_NULL, related_name="matieres",
+                              help_text="Salle spécialisée nécessaire (labo, terrain…)")
 
     class Meta:
         ordering = ["nom"]
@@ -66,6 +82,8 @@ class Cours(models.Model):
     coefficient = models.DecimalField(max_digits=4, decimal_places=1, default=1)
     enseignant = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="cours")
+    volume_horaire = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Heures par semaine")
+    decoupage = models.CharField(max_length=30, blank=True, help_text="Séances, ex. « 2+2+1 » ; vide : séances de 1 h")
 
     class Meta:
         ordering = ["classe", "matiere__nom"]
@@ -74,6 +92,14 @@ class Cours(models.Model):
 
     def __str__(self):
         return f"{self.matiere} – {self.classe.nom}"
+
+    def seances(self):
+        """Durées des séances de la semaine (en heures)."""
+        if not self.volume_horaire:
+            return []
+        if self.decoupage:
+            return [int(x) for x in self.decoupage.split("+")]
+        return [1] * self.volume_horaire
 
 
 class Surveillance(models.Model):
@@ -244,3 +270,63 @@ class Creneau(models.Model):
     class Meta:
         ordering = ["jour", "debut"]
         constraints = [models.CheckConstraint(condition=models.Q(fin__gt=models.F("debut")), name="creneau_fin_apres_debut")]
+
+
+class GrilleHoraire(models.Model):
+    """
+    Grille de l'école (une seule ligne) : heures de début des créneaux d'une heure, et créneaux ouverts.
+    Un créneau est (jour 1..6, indice dans `heures`). Avant 13 h : matin ; ensuite : après-midi.
+    """
+
+    heures = models.JSONField(default=list)
+    ouverts = models.JSONField(default=list, help_text="[[jour, indice], …]")
+
+    HEURES_DEFAUT = ["08:00", "09:00", "10:00", "11:00", "12:00", "15:00", "16:00"]
+
+    @classmethod
+    def actuelle(cls):
+        g = cls.objects.first()
+        if g is None:
+            ouverts = [[j, i] for j in range(1, 7) for i in range(5)] + [[j, i] for j in (1, 2, 4, 5) for i in (5, 6)]
+            g = cls.objects.create(heures=cls.HEURES_DEFAUT, ouverts=sorted(ouverts))
+        return g
+
+
+class Disponibilite(models.Model):
+    """
+    Disponibilités d'un enseignant sur la grille : créneaux indisponibles et créneaux préférés.
+    Le professeur propose depuis son compte ; la direction valide (ou saisit directement). Seule la
+    version validée sert au générateur.
+    """
+
+    enseignant = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="disponibilite")
+    indispo = models.JSONField(default=list)
+    prefere = models.JSONField(default=list)
+    indispo_propose = models.JSONField(null=True, blank=True)
+    prefere_propose = models.JSONField(null=True, blank=True)
+    propose_le = models.DateTimeField(null=True, blank=True)
+    valide_le = models.DateTimeField(null=True, blank=True)
+
+
+class GenerationEDT(models.Model):
+    """Un calcul d'emplois du temps (lancé en tâche de fond) et ses propositions."""
+
+    class Statut(models.TextChoices):
+        EN_COURS = "en_cours", "En cours"
+        TERMINEE = "terminee", "Terminée"
+        IMPOSSIBLE = "impossible", "Impossible"
+        ECHEC = "echec", "Échec"
+
+    annee = models.ForeignKey(AnneeScolaire, on_delete=models.CASCADE, related_name="generations_edt")
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.EN_COURS)
+    diagnostic = models.JSONField(default=dict)
+    propositions = models.JSONField(default=list)
+    message = models.CharField(max_length=300, blank=True)
+    progression = models.PositiveSmallIntegerField(default=0)
+    publiee = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Numéro de la proposition publiée")
+    cree_par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    cree_le = models.DateTimeField(auto_now_add=True)
+    termine_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-cree_le"]

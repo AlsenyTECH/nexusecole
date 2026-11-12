@@ -62,10 +62,10 @@ export type Creneau = {
   jour: number; debut: string; fin: string; salle: string;
 };
 export type Periode = { id: number; annee: number; nom: string; ordre: number; debut: string; fin: string };
-export type Matiere = { id: number; nom: string; code: string };
+export type Matiere = { id: number; nom: string; code: string; lourde: boolean; salle: number | null };
 export type Cours = {
   id: number; classe: number; classe_nom: string; matiere: number; matiere_nom: string; coefficient: string;
-  enseignant: number | null; enseignant_nom: string;
+  enseignant: number | null; enseignant_nom: string; volume_horaire: number | null; decoupage: string;
 };
 export type Evaluation = {
   id: number; cours: number; periode: number; type: "devoir" | "composition"; titre: string; date: string; sur: number;
@@ -92,4 +92,27 @@ export type Bulletin = {
     ecole: string; annee: string; periode: string; classe: string; effectif: number; bareme: number;
     statistiques: Resultats["statistiques"];
   };
+};
+
+/* ---- Générateur d'emplois du temps ---- */
+export type Case = [number, number]; // [jour 1..6, indice de l'heure]
+export type GrilleEcole = { heures: string[]; ouverts: Case[] };
+export type SalleSpecialisee = { id: number; nom: string; nombre: number; matieres: string[] };
+export type Disponibilite = {
+  enseignant: number; nom: string; statut: string; indispo: Case[]; prefere: Case[];
+  proposition: { indispo: Case[]; prefere: Case[]; le: string } | null; valide_le: string | null;
+};
+export type Diagnostic = {
+  erreurs: string[]; alertes: string[];
+  charge: { seances: number; heures: number; creneaux_ouverts: number; classes: number; professeurs: number };
+  cours_sans_volume?: number; cours_sans_enseignant?: number; propositions_en_attente?: number; heures?: string[];
+};
+export type Placement = {
+  cours: number; classe: string; matiere: string; prof: number | null; prof_nom: string; jour: number; heure: number; duree: number; salle: string;
+};
+export type Proposition = { numero: number; score: number; optimal: boolean; faiblesses: string[]; placements: Placement[] };
+export type GenerationEDT = {
+  id: number; annee: number; statut: "en_cours" | "terminee" | "impossible" | "echec"; diagnostic: Diagnostic;
+  propositions: Proposition[]; message: string; progression: number; publiee: number | null; cree_par_nom: string;
+  cree_le: string; termine_le: string | null;
 };

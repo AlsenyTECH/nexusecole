@@ -190,6 +190,40 @@ def remplir_familles(ecole):
         return True
 
 
+# Heures par semaine, découpage en séances, matière lourde, salle spécialisée
+VOLUMES = {"Mathématiques": (5, "2+2+1", True, None), "Français": (5, "2+2+1", True, None), "Anglais": (3, "", False, None),
+           "Sciences de la vie et de la Terre": (2, "2", True, "Laboratoire"), "Histoire-Géographie": (3, "2+1", False, None),
+           "Éducation physique": (2, "2", False, "Terrain de sport"), "Calcul": (5, "2+2+1", True, None),
+           "Éveil scientifique": (2, "1+1", False, None)}
+
+
+def remplir_edt(ecole):
+    """Données du générateur d'emplois du temps : volumes, salles spécialisées, disponibilités (idempotent)."""
+    from pedagogie.models import Cours, Disponibilite, GrilleHoraire, Matiere, SalleSpecialisee
+
+    with schema_context(ecole.schema_name):
+        if SalleSpecialisee.objects.exists() or not Matiere.objects.exists():
+            return False
+        GrilleHoraire.actuelle()
+        salles = {nom: SalleSpecialisee.objects.create(nom=nom, nombre=1) for nom in ("Laboratoire", "Terrain de sport")}
+        for matiere in Matiere.objects.all():
+            volume, decoupage, lourde, salle = VOLUMES.get(matiere.nom, (2, "", False, None))
+            matiere.lourde, matiere.salle = lourde, salles.get(salle)
+            matiere.save(update_fields=["lourde", "salle"])
+            Cours.objects.filter(matiere=matiere, volume_horaire__isnull=True).update(volume_horaire=volume, decoupage=decoupage)
+        # La professeure d'anglais est vacataire : elle enseigne ailleurs le lundi et le mardi
+        vacataire = Utilisateur.objects.filter(email="prof.anglais@lycee-demo.sn").first()
+        if vacataire:
+            Disponibilite.objects.create(enseignant=vacataire, indispo=[[j, i] for j in (1, 2) for i in range(7)],
+                                         valide_le=timezone.now())
+        # Le professeur de maths propose de garder le mercredi matin libre (à valider par la direction)
+        maths = Utilisateur.objects.filter(email="prof@lycee-demo.sn").first()
+        if maths:
+            Disponibilite.objects.create(enseignant=maths, indispo_propose=[[3, i] for i in range(5)], prefere_propose=[],
+                                         propose_le=timezone.now())
+        return True
+
+
 def remplir_carte(ecole):
     """Services à la carte, points de vente, recharges, ventes et activités de démonstration (idempotent)."""
     from activites import services as billetterie

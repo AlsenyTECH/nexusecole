@@ -8,6 +8,8 @@ from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, Conseil
                              EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
                              ReouvertureView, ResultatsView, SurveillanceViewSet, VerificationView)
 from pedagogie.equipe import CreneauViewSet, EnseignantViewSet
+from pedagogie.edt import (DiagnosticView, DisponibilitesView, GenerationViewSet, GrilleView, MesDisponibilitesView,
+                           PublierView, SalleViewSet)
 from activites.views import ActiviteViewSet
 from carte.views import (CarteEleveView, CartesView, ControleView, GrandLivreView, LectureCarteView, ParametresCarteView,
                          PassageViewSet, PhotoView, PointDeVenteViewSet, ArticleViewSet, PortefeuilleView,
@@ -31,6 +33,8 @@ router.register("enseignants", EnseignantViewSet, basename="enseignant")
 router.register("responsables", ResponsableViewSet)
 router.register("liens-responsables", LienResponsableViewSet)
 router.register("creneaux", CreneauViewSet)
+router.register("edt/salles", SalleViewSet)
+router.register("edt/generations", GenerationViewSet)
 router.register("souscriptions", SouscriptionViewSet)
 router.register("caisses", CaisseViewSet)
 router.register("points-de-vente", PointDeVenteViewSet)
@@ -61,6 +65,12 @@ urlpatterns = [
     path("api/pedagogie/parametres", ParametresView.as_view()),
     path("api/pedagogie/journal", JournalView.as_view()),
     path("api/appel", AppelView.as_view()),
+    path("api/edt/grille", GrilleView.as_view()),
+    path("api/edt/diagnostic", DiagnosticView.as_view()),
+    path("api/edt/disponibilites", DisponibilitesView.as_view()),
+    path("api/edt/disponibilites/<int:pk>", DisponibilitesView.as_view()),
+    path("api/edt/mes-disponibilites", MesDisponibilitesView.as_view()),
+    path("api/edt/generations/<int:pk>/publier", PublierView.as_view()),
     path("api/resultats", ResultatsView.as_view()),
     path("api/conseils", ConseilView.as_view()),
     path("api/decisions", DecisionsView.as_view()),

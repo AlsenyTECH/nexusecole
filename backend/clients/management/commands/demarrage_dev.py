@@ -39,6 +39,8 @@ class Command(BaseCommand):
             ecole_demo.save(update_fields=["modules_supplementaires"])
         if demo.remplir_carte(ecole_demo):
             self.stdout.write("  Services, cartes, porte-monnaie, cantine, boutique et activités de démonstration ajoutés.")
+        if demo.remplir_edt(ecole_demo):
+            self.stdout.write("  Générateur d'emplois du temps : volumes, laboratoire, terrain, disponibilités de démonstration.")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
