@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import connection, transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers, viewsets
@@ -18,7 +19,7 @@ from rest_framework.views import APIView
 from clients.models import Module
 from comptes.models import Role, Utilisateur
 from comptes.permissions import AbonnementValide, ModuleActif, permission
-from scolarite.models import AnneeScolaire
+from scolarite.models import AnneeScolaire, Classe
 
 from . import generation
 from .models import Cours, Disponibilite, GenerationEDT, GrilleHoraire, SalleSpecialisee
@@ -51,9 +52,9 @@ class GrilleView(Base, APIView):
     permission_classes = [AbonnementValide, ModuleActif, permission("eleves.voir", "emploi_du_temps.gerer")]
 
     def get(self, request):
-        g = GrilleHoraire.actuelle()
-        return Response({"heures": g.heures, "ouverts": g.ouverts})
+        return Response(_grille_json(GrilleHoraire.actuelle()))
 
+    @transaction.atomic
     def put(self, request):
         g = GrilleHoraire.actuelle()
         heures = request.data.get("heures", g.heures)
@@ -65,10 +66,53 @@ class GrilleView(Base, APIView):
                 raise ValidationError({"heures": f"{a} et {b} : les créneaux durent une heure, ils ne peuvent pas se chevaucher."})
         if heures != g.heures and GenerationEDT.objects.filter(statut=GenerationEDT.Statut.EN_COURS).exists():
             raise ValidationError({"detail": "Un calcul est en cours : attendez sa fin pour changer les heures."})
+        if heures != g.heures:
+            _renumeroter(g.heures, heures)
         g.heures = heures
         g.ouverts = _creneaux(request.data.get("ouverts", g.ouverts), g, "ouverts")
         g.save()
-        return Response({"heures": g.heures, "ouverts": g.ouverts})
+        return Response(_grille_json(g))
+
+
+def _grille_json(g):
+    annee = AnneeScolaire.objects.filter(active=True).first()
+    classes = Classe.objects.filter(annee=annee) if annee else Classe.objects.none()
+    return {"heures": g.heures, "ouverts": g.ouverts,
+            "classes": [{"id": c.pk, "nom": c.nom, "ouverts": c.creneaux_edt} for c in classes]}
+
+
+def _renumeroter(anciennes, nouvelles):
+    """
+    Les créneaux sont repérés par leur rang dans la liste des heures : quand on ajoute ou retire une heure,
+    on renumérote les grilles des classes et les disponibilités (une heure retirée disparaît).
+    """
+    rang = {i: nouvelles.index(h) for i, h in enumerate(anciennes) if h in nouvelles}
+
+    def conv(cases):
+        if cases is None:
+            return None
+        return sorted([j, rang[i]] for j, i in cases if i in rang)
+
+    for c in Classe.objects.filter(creneaux_edt__isnull=False):
+        c.creneaux_edt = conv(c.creneaux_edt)
+        c.save(update_fields=["creneaux_edt"])
+    for d in Disponibilite.objects.all():
+        d.indispo, d.prefere = conv(d.indispo), conv(d.prefere)
+        d.indispo_propose, d.prefere_propose = conv(d.indispo_propose), conv(d.prefere_propose)
+        d.save()
+
+
+class GrilleClasseView(Base, APIView):
+    """Grille propre à une classe (ex. le collège finit à 13 h) : {ouverts: [...]} ou {ouverts: null} pour revenir à celle de l'école."""
+
+    permission_classes = [AbonnementValide, ModuleActif, GERER]
+
+    def put(self, request, pk):
+        classe = get_object_or_404(Classe, pk=pk)
+        valeur = request.data.get("ouverts")
+        classe.creneaux_edt = None if valeur is None else _creneaux(valeur, GrilleHoraire.actuelle(), "ouverts")
+        classe.save(update_fields=["creneaux_edt"])
+        return Response({"id": classe.pk, "nom": classe.nom, "ouverts": classe.creneaux_edt})
 
 
 # --------------------------------------------------------------------------- #
@@ -115,6 +159,13 @@ def _lire(data, grille):
     return indispo, prefere
 
 
+def _enseignants():
+    """Comptes enseignants, et toute personne qui tient un cours cette année (directeur, surveillant qui enseignent)."""
+    annee = AnneeScolaire.objects.filter(active=True).first()
+    titulaires = Cours.objects.filter(classe__annee=annee, enseignant__isnull=False).values("enseignant")
+    return Utilisateur.objects.filter(Q(role=Role.ENSEIGNANT) | Q(pk__in=titulaires)).distinct()
+
+
 class DisponibilitesView(Base, APIView):
     """Direction : liste de tous les enseignants ; PUT …/<id> saisit et valide ; POST …/<id>/valider accepte la proposition."""
 
@@ -122,12 +173,11 @@ class DisponibilitesView(Base, APIView):
 
     def get(self, request, pk=None):
         dispo = {d.enseignant_id: d for d in Disponibilite.objects.all()}
-        profs = (Utilisateur.objects.filter(role=Role.ENSEIGNANT, is_active=True)
-                 .select_related("profil_enseignant").order_by("nom", "prenom"))
+        profs = (_enseignants().filter(is_active=True).select_related("profil_enseignant").order_by("nom", "prenom"))
         return Response([_dispo_json(u, dispo.get(u.pk)) for u in profs])
 
     def put(self, request, pk):
-        user = get_object_or_404(Utilisateur, pk=pk, role=Role.ENSEIGNANT)
+        user = get_object_or_404(_enseignants(), pk=pk)
         indispo, prefere = _lire(request.data, GrilleHoraire.actuelle())
         d, _ = Disponibilite.objects.get_or_create(enseignant=user)
         d.indispo, d.prefere, d.valide_le = indispo, prefere, timezone.now()

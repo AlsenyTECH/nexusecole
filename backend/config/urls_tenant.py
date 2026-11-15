@@ -8,7 +8,7 @@ from pedagogie.views import (AbsenceViewSet, AppelView, BulletinViewSet, Conseil
                              EvaluationViewSet, JournalView, MatiereViewSet, ParametresView, PeriodeViewSet,
                              ReouvertureView, ResultatsView, SurveillanceViewSet, VerificationView)
 from pedagogie.equipe import CreneauViewSet, EnseignantViewSet
-from pedagogie.edt import (DiagnosticView, DisponibilitesView, GenerationViewSet, GrilleView, MesDisponibilitesView,
+from pedagogie.edt import (DiagnosticView, DisponibilitesView, GenerationViewSet, GrilleClasseView, GrilleView, MesDisponibilitesView,
                            PublierView, SalleViewSet)
 from activites.views import ActiviteViewSet
 from carte.views import (CarteEleveView, CartesView, ControleView, GrandLivreView, LectureCarteView, ParametresCarteView,
@@ -66,6 +66,7 @@ urlpatterns = [
     path("api/pedagogie/journal", JournalView.as_view()),
     path("api/appel", AppelView.as_view()),
     path("api/edt/grille", GrilleView.as_view()),
+    path("api/edt/grille/classes/<int:pk>", GrilleClasseView.as_view()),
     path("api/edt/diagnostic", DiagnosticView.as_view()),
     path("api/edt/disponibilites", DisponibilitesView.as_view()),
     path("api/edt/disponibilites/<int:pk>", DisponibilitesView.as_view()),

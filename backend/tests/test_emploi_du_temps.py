@@ -80,8 +80,7 @@ class SolveurTests(SimpleTestCase):
         self.assertEqual(generation.resoudre(d, propositions=1, limite=5), [])
 
 
-@override_settings(EDT_SYNCHRONE=True)
-class GenerationApiTests(BaseFinances):
+class BaseEDT(BaseFinances):
     def setUp(self):
         super().setUp()
         with schema_context(self.ecole_a.schema_name):
@@ -97,6 +96,10 @@ class GenerationApiTests(BaseFinances):
             self.cours += [Cours.objects.create(classe=c, matiere=svt, enseignant=self.prof2, volume_horaire=2, decoupage="2")
                            for c in (self.sixieme, b)]
         self.prof_client = self.auth(HOTE_A, "prof@a.sn")
+
+
+@override_settings(EDT_SYNCHRONE=True)
+class GenerationApiTests(BaseEDT):
 
     def test_generer_comparer_publier(self):
         diag = self.dir.get("/api/edt/diagnostic").json()
@@ -163,6 +166,57 @@ class GenerationApiTests(BaseFinances):
         self.assertEqual(len(g["ouverts"]), 38)
         self.assertEqual(self.dir.put("/api/edt/grille", {"heures": ["08:00", "08:30"]}, format="json").status_code, 400)
         r = self.dir.put("/api/edt/grille", {"heures": ["07:30", "08:30", "09:30"], "ouverts": [[1, 0]]}, format="json")
-        self.assertEqual(r.json(), {"heures": ["07:30", "08:30", "09:30"], "ouverts": [[1, 0]]})
+        self.assertEqual((r.json()["heures"], r.json()["ouverts"]), (["07:30", "08:30", "09:30"], [[1, 0]]))
         with schema_context(self.ecole_a.schema_name):
             self.assertFalse(Creneau.objects.exists())
+
+
+class GrilleParClasseEtDominantesTests(SimpleTestCase):
+    def test_grille_propre_a_une_classe(self):
+        d = petite_ecole()
+        d.ouverts_classe = {"6e B": {(j, i) for j, i in OUVERTS if j in (4, 5, 6)}}  # la 6e B : jeudi à samedi seulement
+        p = generation.resoudre(d, propositions=1, limite=10)[0]["placements"]
+        self.assertTrue(all(x["jour"] >= 4 for x in p if x["classe"] == "6e B"))
+        d.ouverts_classe = {"6e B": {(1, 0)}}
+        self.assertTrue(any("6e B a 4 h de cours pour 1 créneaux" in e or "6e B" in e for e in generation.diagnostiquer(d)["erreurs"]))
+
+    def test_pas_de_seance_a_cheval_sur_une_pause(self):
+        d = petite_ecole()
+        d.heures = ["08:00", "09:00", "10:30", "11:30", "15:00", "16:00", "17:00"]  # pause de 10 h à 10 h 30
+        d.ouverts = {(j, i) for j in range(1, 7) for i in range(7)}
+        for p in generation.resoudre(d, propositions=1, limite=10)[0]["placements"]:
+            if p["duree"] == 2:
+                self.assertNotEqual(p["heure"], 1, "séance de 9 h à 11 h 30 coupée par la pause")
+
+
+@override_settings(EDT_SYNCHRONE=True)
+class GrilleApiTests(BaseEDT):
+    def test_heures_ajoutees_et_disponibilites_renumerotees(self):
+        self.dir.put(f"/api/edt/disponibilites/{self.prof.pk}", {"indispo": [[1, 5]]}, format="json")  # lundi 15 h
+        heures = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"]
+        r = self.dir.put("/api/edt/grille", {"heures": heures, "ouverts": [[1, 0], [1, 7]]}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        dispo = {d["enseignant"]: d for d in self.dir.get("/api/edt/disponibilites").json()}
+        self.assertEqual(dispo[self.prof.pk]["indispo"], [[1, 7]])  # toujours lundi 15 h
+
+    def test_grille_de_classe_et_dominante_par_classe(self):
+        r = self.dir.put(f"/api/edt/grille/classes/{self.sixieme.pk}", {"ouverts": [[j, i] for j in (1, 2, 3) for i in range(5)]},
+                         format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        g = self.dir.get("/api/edt/grille").json()
+        self.assertEqual(next(c for c in g["classes"] if c["id"] == self.sixieme.pk)["ouverts"][0], [1, 0])
+        # SVT n'est pas dominante en 6e A (réglage du cours), elle le reste ailleurs (réglage de la matière)
+        self.assertEqual(self.dir.patch(f"/api/cours/{self.cours[2].pk}", {"lourde": False}, format="json").json()["lourde_effective"], False)
+        self.assertTrue(self.dir.get(f"/api/cours/{self.cours[3].pk}").json()["lourde_effective"])
+        gen = self.dir.post("/api/edt/generations", {}, format="json").json()
+        self.assertEqual(gen["statut"], "terminee", gen["message"])
+        self.assertTrue(all(p["jour"] <= 3 for p in gen["propositions"][0]["placements"] if p["classe"] == "6e A"))
+        self.dir.put(f"/api/edt/grille/classes/{self.sixieme.pk}", {"ouverts": None}, format="json")
+        self.assertIsNone(next(c for c in self.dir.get("/api/edt/grille").json()["classes"] if c["id"] == self.sixieme.pk)["ouverts"])
+
+    def test_disponibilites_d_un_directeur_qui_enseigne(self):
+        with schema_context(self.ecole_a.schema_name):
+            directeur = Utilisateur.objects.get(email="dir@a.sn")
+            Cours.objects.filter(pk=self.cours[0].pk).update(enseignant=directeur)
+        self.assertIn(directeur.pk, [d["enseignant"] for d in self.dir.get("/api/edt/disponibilites").json()])
+        self.assertEqual(self.dir.put(f"/api/edt/disponibilites/{directeur.pk}", {"indispo": [[1, 0]]}, format="json").status_code, 200)

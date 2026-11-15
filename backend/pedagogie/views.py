@@ -105,11 +105,12 @@ class CoursSerializer(serializers.ModelSerializer):
     matiere_nom = serializers.CharField(source="matiere.nom", read_only=True)
     classe_nom = serializers.CharField(source="classe.nom", read_only=True)
     enseignant_nom = serializers.CharField(source="enseignant.nom_complet", read_only=True, default="")
+    lourde_effective = serializers.BooleanField(source="est_lourde", read_only=True)
 
     class Meta:
         model = Cours
         fields = ["id", "classe", "classe_nom", "matiere", "matiere_nom", "coefficient", "enseignant", "enseignant_nom",
-                  "volume_horaire", "decoupage"]
+                  "volume_horaire", "decoupage", "lourde", "lourde_effective"]
 
     def validate_enseignant(self, user):
         if user and user.role not in TYPES_ENSEIGNANTS:

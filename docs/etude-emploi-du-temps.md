@@ -90,9 +90,13 @@ combinaisons : un **solveur de contraintes** trouve de très bonnes solutions en
 **API** (droit `emploi_du_temps.gerer`, sauf mention) :
 
 - `GET/PUT /api/edt/grille` : heures de début et créneaux ouverts `[[jour, indice], …]` (lecture : `eleves.voir`).
+  Quand on ajoute ou retire une heure, les grilles des classes et les disponibilités sont renumérotées (une heure
+  retirée disparaît). Une séance de 2 h ne franchit ni la coupure de 13 h ni une pause entre deux créneaux.
+- `PUT /api/edt/grille/classes/<id> {ouverts}` : grille propre à une classe (`null` : elle suit celle de l'école).
 - `/api/edt/salles` : salles spécialisées (nom, nombre). Une matière est rattachée à une salle par `PATCH /api/matieres/<id> {salle}` ;
-  `lourde` se règle de la même façon. Volume et découpage : `PATCH /api/cours/<id> {volume_horaire, decoupage: "2+2+1"}`.
-- `GET /api/edt/disponibilites` ; `PUT /api/edt/disponibilites/<prof>` (saisie directe, validée) ;
+  `lourde` (dominante par défaut) se règle de la même façon. Par classe : `PATCH /api/cours/<id> {volume_horaire,
+  decoupage: "2+2+1", lourde}` ; `lourde` vide suit la matière (maths dominante en S, pas en L).
+- `GET /api/edt/disponibilites` (enseignants, et toute personne qui tient un cours, ex. un directeur qui enseigne) ; `PUT /api/edt/disponibilites/<prof>` (saisie directe, validée) ;
   `POST /api/edt/disponibilites/<prof>` (valider la proposition, ou `{refuser: true}`).
 - `GET/PUT /api/edt/mes-disponibilites` : le professeur propose (tout compte enseignant).
 - `GET /api/edt/diagnostic` : charge et impossibilités, avant tout calcul.
@@ -100,6 +104,10 @@ combinaisons : un **solveur de contraintes** trouve de très bonnes solutions en
   donne l'avancement (`progression`) puis les propositions notées et leurs points faibles. Un calcul « en cours »
   depuis plus de 6 minutes (redémarrage du serveur) passe en échec à la lecture suivante.
 - `POST /api/edt/generations/<id>/publier {proposition}` : remplace les créneaux de l'année par la proposition retenue.
+
+**Démo lycée** : Seconde S et L, Premières S1, S2 et L, Terminales S2 et L2, avec heures, coefficients et dominantes
+par série, et 14 professeurs (espagnol vacataire indisponible le jeudi). Le laboratoire passe à 2 salles.
+Calcul complet (12 classes, 17 professeurs, 170 séances) : 3 propositions optimales en 2 s environ.
 
 **Démo** : volumes de toutes les matières, un laboratoire (SVT) et un terrain (EPS), professeure d'anglais vacataire
 indisponible lundi et mardi, proposition du professeur de maths à valider (mercredi matin libre). Calcul : 60 séances,

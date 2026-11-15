@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpenCheck, GraduationCap, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpenCheck, CalendarClock, GraduationCap, Pencil, Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Avatar, Champ, Choix, EnTete, Pastille, Squelette } from "@/components/design";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,10 @@ export function Enseignants() {
                 <div className="mt-auto flex flex-wrap gap-2">
                   {peut("scolarite.parametrer") ? <Button size="sm" onClick={() => setClasses(e)}><BookOpenCheck /> Classes et matières</Button> : null}
                   <Button size="sm" variant="secondary" onClick={() => setFiche(e)}><Pencil /> Fiche</Button>
+                  {peut("emploi_du_temps.gerer") ? (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link to={`/emploi-du-temps/generateur?etape=dispos&prof=${e.id}`}><CalendarClock /> Disponibilités</Link>
+                    </Button>) : null}
                   <Button size="sm" variant="ghost" className="ml-auto text-destructive" onClick={() => retirer(e)} aria-label={`Supprimer ${e.prenom} ${e.nom}`}><Trash2 /></Button>
                 </div>
               </div>

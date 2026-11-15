@@ -84,6 +84,8 @@ class Cours(models.Model):
                                    related_name="cours")
     volume_horaire = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Heures par semaine")
     decoupage = models.CharField(max_length=30, blank=True, help_text="Séances, ex. « 2+2+1 » ; vide : séances de 1 h")
+    lourde = models.BooleanField(null=True, blank=True,
+                                 help_text="Matière dominante dans cette classe (de préférence le matin) ; vide : réglage de la matière")
 
     class Meta:
         ordering = ["classe", "matiere__nom"]
@@ -92,6 +94,10 @@ class Cours(models.Model):
 
     def __str__(self):
         return f"{self.matiere} – {self.classe.nom}"
+
+    @property
+    def est_lourde(self):
+        return self.matiere.lourde if self.lourde is None else self.lourde
 
     def seances(self):
         """Durées des séances de la semaine (en heures)."""

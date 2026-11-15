@@ -40,6 +40,8 @@ class Classe(models.Model):
     niveau = models.CharField(max_length=30, blank=True)
     bareme = models.PositiveSmallIntegerField(default=20, choices=[(10, "Sur 10"), (20, "Sur 20")],
                                               help_text="Barème des notes : /10 à l'élémentaire, /20 ensuite")
+    creneaux_edt = models.JSONField(null=True, blank=True,
+                                    help_text="Créneaux ouverts propres à la classe [[jour, indice]] ; vide : grille de l'école")
 
     class Meta:
         ordering = ["niveau", "nom"]

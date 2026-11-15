@@ -41,11 +41,14 @@ class Command(BaseCommand):
             self.stdout.write("  Services, cartes, porte-monnaie, cantine, boutique et activités de démonstration ajoutés.")
         if demo.remplir_edt(ecole_demo):
             self.stdout.write("  Générateur d'emplois du temps : volumes, laboratoire, terrain, disponibilités de démonstration.")
+        if demo.remplir_lycee(ecole_demo):
+            self.stdout.write("  Lycée : Seconde S et L, Premières S1, S2 et L, Terminales S2 et L2, et leurs professeurs.")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
             "\n  Caisse  : caisse@lycee-demo.sn / Demo-Nexus-2026"
             "\n  Prof    : prof@lycee-demo.sn / Demo-Nexus-2026 (mathématiques)"
+            "\n  Profs du lycée : moussa.diallo@, khady.diouf@, seydou.cisse@… lycee-demo.sn / Demo-Nexus-2026"
             "\n  Surveillant : surveillant@lycee-demo.sn / Demo-Nexus-2026 (6e A, 5e A)"
             "\n  Parent  : parent@lycee-demo.sn / Demo-Nexus-2026 (mère d'Aminata, tutrice de Babacar)\n"
         ))

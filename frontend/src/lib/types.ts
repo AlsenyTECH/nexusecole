@@ -66,6 +66,7 @@ export type Matiere = { id: number; nom: string; code: string; lourde: boolean; 
 export type Cours = {
   id: number; classe: number; classe_nom: string; matiere: number; matiere_nom: string; coefficient: string;
   enseignant: number | null; enseignant_nom: string; volume_horaire: number | null; decoupage: string;
+  lourde: boolean | null; lourde_effective: boolean;
 };
 export type Evaluation = {
   id: number; cours: number; periode: number; type: "devoir" | "composition"; titre: string; date: string; sur: number;
@@ -96,7 +97,7 @@ export type Bulletin = {
 
 /* ---- Générateur d'emplois du temps ---- */
 export type Case = [number, number]; // [jour 1..6, indice de l'heure]
-export type GrilleEcole = { heures: string[]; ouverts: Case[] };
+export type GrilleEcole = { heures: string[]; ouverts: Case[]; classes?: { id: number; nom: string; ouverts: Case[] | null }[] };
 export type SalleSpecialisee = { id: number; nom: string; nombre: number; matieres: string[] };
 export type Disponibilite = {
   enseignant: number; nom: string; statut: string; indispo: Case[]; prefere: Case[];

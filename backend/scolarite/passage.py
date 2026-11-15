@@ -64,7 +64,8 @@ def reconduire(source, *, libelle, debut, fin, classes=True, frais=True, cours=T
     correspondance = {}
     if classes or cours:
         for c in source.classes.all():
-            correspondance[c.pk] = Classe.objects.create(annee=cible, nom=c.nom, niveau=c.niveau, bareme=c.bareme)
+            correspondance[c.pk] = Classe.objects.create(annee=cible, nom=c.nom, niveau=c.niveau, bareme=c.bareme,
+                                                              creneaux_edt=c.creneaux_edt)
         bilan["classes"] = len(correspondance)
     if frais:
         from finances.models import Frais
@@ -79,7 +80,8 @@ def reconduire(source, *, libelle, debut, fin, classes=True, frais=True, cours=T
     if cours:
         from pedagogie.models import Cours
 
-        nouveaux = [Cours(classe=correspondance[c.classe_id], matiere_id=c.matiere_id, coefficient=c.coefficient)  # sans enseignant
+        nouveaux = [Cours(classe=correspondance[c.classe_id], matiere_id=c.matiere_id, coefficient=c.coefficient,  # sans enseignant
+                           volume_horaire=c.volume_horaire, decoupage=c.decoupage, lourde=c.lourde)
                     for c in Cours.objects.filter(classe__annee=source)]
         Cours.objects.bulk_create(nouveaux)
         bilan["cours"] = len(nouveaux)

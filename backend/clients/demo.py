@@ -224,6 +224,85 @@ def remplir_edt(ecole):
         return True
 
 
+# Lycée : (niveau, {matière: (heures, séances, coefficient, dominante de la série)})
+MATH, PC, SVT, FR, ANG, ESP, HG, EPS, PHILO = ("Mathématiques", "Physique-Chimie", "Sciences de la vie et de la Terre", "Français",
+                                             "Anglais", "Espagnol", "Histoire-Géographie", "Éducation physique", "Philosophie")
+LYCEE = {
+    "Seconde S": ("Seconde", {MATH: (5, "2+2+1", 5, True), PC: (4, "2+2", 4, True), SVT: (3, "2+1", 3, True), FR: (5, "2+2+1", 3, False),
+                              ANG: (3, "", 2, False), ESP: (3, "2+1", 2, False), HG: (3, "2+1", 2, False), EPS: (2, "2", 1, False)}),
+    "Seconde L": ("Seconde", {FR: (6, "2+2+2", 5, True), ANG: (4, "2+2", 4, True), ESP: (4, "2+2", 3, False), HG: (4, "2+2", 3, True),
+                              MATH: (3, "2+1", 2, False), SVT: (2, "2", 2, False), EPS: (2, "2", 1, False)}),
+    "Première S1": ("Première", {MATH: (7, "2+2+2+1", 8, True), PC: (7, "2+2+2+1", 8, True), SVT: (2, "2", 2, False),
+                                 FR: (4, "2+2", 3, False), ANG: (3, "", 2, False), HG: (2, "2", 2, False), EPS: (2, "2", 1, False)}),
+    "Première S2": ("Première", {MATH: (5, "2+2+1", 5, True), PC: (5, "2+2+1", 5, True), SVT: (5, "2+2+1", 5, True),
+                                 FR: (4, "2+2", 3, False), ANG: (3, "", 2, False), HG: (2, "2", 2, False), EPS: (2, "2", 1, False)}),
+    "Première L": ("Première", {FR: (5, "2+2+1", 5, True), PHILO: (3, "2+1", 4, True), ANG: (4, "2+2", 4, False), ESP: (4, "2+2", 3, False),
+                                HG: (4, "2+2", 4, True), MATH: (2, "2", 2, False), SVT: (2, "2", 2, False), EPS: (2, "2", 1, False)}),
+    "Terminale S2": ("Terminale", {MATH: (5, "2+2+1", 5, True), PC: (5, "2+2+1", 6, True), SVT: (5, "2+2+1", 6, True),
+                                   PHILO: (3, "2+1", 2, False), FR: (3, "2+1", 3, False), ANG: (2, "", 2, False), HG: (2, "2", 2, False),
+                                   EPS: (2, "2", 1, False)}),
+    "Terminale L2": ("Terminale", {PHILO: (7, "2+2+2+1", 6, True), FR: (5, "2+2+1", 4, True), ANG: (4, "2+2", 3, False),
+                                   ESP: (4, "2+2", 3, False), HG: (4, "2+2", 4, True), MATH: (2, "2", 2, False), SVT: (2, "2", 2, False),
+                                   EPS: (2, "2", 1, False)}),
+}
+# Professeurs du lycée : (email, prénom, nom, statut, matière, classes ; "college" = aussi les classes du collège sans enseignant)
+PROFS_LYCEE = [
+    ("moussa.diallo", "Moussa", "Diallo", "permanent", MATH, ["Seconde S", "Seconde L", "Première S1", "Terminale L2"]),
+    ("ibrahima.sarr", "Ibrahima", "Sarr", "permanent", MATH, ["Première S2", "Première L", "Terminale S2"]),
+    ("cheikh.ndao", "Cheikh", "Ndao", "permanent", PC, ["Seconde S", "Première S1"]),
+    ("mariama.ba", "Mariama", "Ba", "permanent", PC, ["Première S2", "Terminale S2"]),
+    ("aminata.sow", "Aminata", "Sow", "permanent", SVT, list(LYCEE)),
+    ("adama.kane", "Adama", "Kane", "stagiaire", SVT, ["college"]),
+    ("ousmane.faye", "Ousmane", "Faye", "permanent", FR, ["Seconde S", "Seconde L", "Première S1"]),
+    ("khady.diouf", "Khady", "Diouf", "permanent", FR, ["Première S2", "Première L", "Terminale S2", "Terminale L2"]),
+    ("seydou.cisse", "Seydou", "Cissé", "permanent", PHILO, ["Première L", "Terminale S2", "Terminale L2"]),
+    ("abdoulaye.gueye", "Abdoulaye", "Guèye", "permanent", ANG, list(LYCEE)),
+    ("ndeye.fall", "Ndèye Fatou", "Fall", "vacataire", ESP, ["Seconde S", "Seconde L", "Première L", "Terminale L2"]),
+    ("pape.mbaye", "Pape", "Mbaye", "permanent", HG, list(LYCEE)),
+    ("awa.ndour", "Awa", "Ndour", "vacataire", HG, ["college"]),
+    ("mamadou.thiam", "Mamadou", "Thiam", "permanent", EPS, list(LYCEE) + ["college"]),
+]
+
+
+def remplir_lycee(ecole):
+    """Classes du lycée (séries S et L), leurs cours et des professeurs pour tester le générateur (idempotent)."""
+    from pedagogie.models import Cours, Disponibilite, Matiere, ProfilEnseignant, SalleSpecialisee
+
+    with schema_context(ecole.schema_name):
+        annee = AnneeScolaire.objects.filter(active=True).first()
+        if not annee or Classe.objects.filter(annee=annee, nom="Seconde S").exists() or not Matiere.objects.exists():
+            return False
+        matieres = {nom: Matiere.objects.get_or_create(nom=nom)[0] for nom in (MATH, PC, SVT, FR, ANG, ESP, HG, EPS, PHILO)}
+        labo = SalleSpecialisee.objects.filter(nom="Laboratoire").first()
+        if labo:  # le lycée partage le laboratoire : l'école en a deux
+            labo.nombre = max(labo.nombre, 2)
+            labo.save(update_fields=["nombre"])
+        cours = {}
+        for nom, (niveau, programme) in LYCEE.items():
+            classe = Classe.objects.create(annee=annee, nom=nom, niveau=niveau)
+            for matiere, (heures, seances, coef, dominante) in programme.items():
+                cours[nom, matiere] = Cours.objects.create(classe=classe, matiere=matieres[matiere], coefficient=coef,
+                                                           volume_horaire=heures, decoupage=seances, lourde=dominante)
+        college = Classe.objects.filter(annee=annee, niveau__in=["6e", "5e", "4e", "3e"])
+        for identifiant, prenom, nom, statut, matiere, classes in PROFS_LYCEE:
+            email = f"{identifiant}@lycee-demo.sn"
+            u = Utilisateur.objects.filter(email=email).first() or Utilisateur.objects.create_user(
+                email, "Demo-Nexus-2026", prenom=prenom, nom=nom, role=Role.ENSEIGNANT)
+            profil, _ = ProfilEnseignant.objects.get_or_create(utilisateur=u, defaults={"statut": statut})
+            profil.matieres.add(matieres[matiere])
+            for c in classes:
+                if c == "college":
+                    Cours.objects.filter(classe__in=college, matiere=matieres[matiere], enseignant__isnull=True).update(enseignant=u)
+                elif (c, matiere) in cours:
+                    cours[c, matiere].enseignant = u
+                    cours[c, matiere].save(update_fields=["enseignant"])
+        # La professeure d'espagnol est vacataire : elle enseigne dans un autre lycée le jeudi
+        fall = Utilisateur.objects.filter(email="ndeye.fall@lycee-demo.sn").first()
+        if fall and not Disponibilite.objects.filter(enseignant=fall).exists():
+            Disponibilite.objects.create(enseignant=fall, indispo=[[4, i] for i in range(7)], valide_le=timezone.now())
+        return True
+
+
 def remplir_carte(ecole):
     """Services à la carte, points de vente, recharges, ventes et activités de démonstration (idempotent)."""
     from activites import services as billetterie

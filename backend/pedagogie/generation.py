@@ -39,19 +39,35 @@ class Donnees:
     prefere: dict = field(default_factory=dict)   # prof → {(jour, indice)}
     salles: dict = field(default_factory=dict)    # id → (nom, nombre)
     alertes: list = field(default_factory=list)   # avertissements non bloquants
+    ouverts_classe: dict = field(default_factory=dict)  # classe → {(jour, indice)} si grille propre à la classe
 
     def demi(self, i):
         return 0 if self.heures[i] < MIDI else 1
 
+    def ouverts_de(self, classe):
+        return self.ouverts_classe.get(classe, self.ouverts)
+
+    def tous(self):
+        """Tous les créneaux ouverts pour au moins une classe."""
+        return set(self.ouverts).union(*self.ouverts_classe.values())
+
+    def suit(self, i):
+        """Le créneau i+1 commence-t-il juste à la fin du créneau i (pas de pause entre les deux) ?"""
+        return i + 1 < len(self.heures) and minutes(self.heures[i + 1]) - minutes(self.heures[i]) == 60
+
     def debuts_possibles(self, s):
-        """Créneaux où la séance peut commencer : heures consécutives ouvertes, même demi-journée, prof disponible."""
-        bloque = self.indispo.get(s.prof, set())
-        for j, i in sorted(self.ouverts):
+        """Créneaux où la séance peut commencer : heures qui se suivent, ouvertes pour la classe, même demi-journée, prof disponible."""
+        bloque, ouverts = self.indispo.get(s.prof, set()), self.ouverts_de(s.classe)
+        for j, i in sorted(ouverts):
             bloc = list(range(i, i + s.duree))
-            if bloc[-1] >= len(self.heures) or any((j, x) not in self.ouverts or (j, x) in bloque or self.demi(x) != self.demi(i)
-                                                    for x in bloc):
+            if (bloc[-1] >= len(self.heures) or any(not self.suit(x) for x in bloc[:-1])
+                    or any((j, x) not in ouverts or (j, x) in bloque or self.demi(x) != self.demi(i) for x in bloc)):
                 continue
             yield j, i
+
+
+def minutes(h):
+    return int(h[:2]) * 60 + int(h[3:5])
 
 
 def lieu(d, j, i):
@@ -63,7 +79,8 @@ def lieu(d, j, i):
 # --------------------------------------------------------------------------- #
 def diagnostiquer(d):
     """{erreurs: [...], alertes: [...], charge: {...}} ; s'il y a des erreurs, aucun calcul ne peut réussir."""
-    erreurs, ouverts = [], len(d.ouverts)
+    erreurs, tous = [], d.tous()
+    ouverts = len(tous)
     par_classe, par_prof, par_salle = defaultdict(int), defaultdict(int), defaultdict(int)
     for s in d.seances:
         par_classe[s.classe] += s.duree
@@ -72,10 +89,11 @@ def diagnostiquer(d):
         if s.salle is not None:
             par_salle[s.salle] += s.duree
     for classe, h in sorted(par_classe.items()):
-        if h > ouverts:
-            erreurs.append(f"La {classe} a {h} h de cours pour {ouverts} créneaux ouverts dans la semaine.")
+        n = len(d.ouverts_de(classe))
+        if h > n:
+            erreurs.append(f"La {classe} a {h} h de cours pour {n} créneaux ouverts dans la semaine.")
     for p, h in par_prof.items():
-        dispo = len(d.ouverts - d.indispo.get(p, set()))
+        dispo = len(tous - d.indispo.get(p, set()))
         if h > dispo:
             erreurs.append(f"{d.profs[p]} a {h} h de cours mais n'est disponible que {dispo} h par semaine.")
     for sid, h in par_salle.items():
@@ -110,6 +128,11 @@ def resoudre(d, propositions=3, limite=30.0, progression=None):
             possibles.append(v)
         m.AddExactlyOne(possibles)
 
+    par_seance = defaultdict(list)   # k → [(jour, début, variable)]
+    for (k, j, i), v in y.items():
+        par_seance[k].append((j, i, v))
+    tous = d.tous()
+
     def couvre(k, j, x):
         return [y[k, j, i] for i in range(x - d.seances[k].duree + 1, x + 1) if (k, j, i) in y]
 
@@ -122,7 +145,7 @@ def resoudre(d, propositions=3, limite=30.0, progression=None):
             groupes["s", s.salle].append(k)
     occupe = {}
     for (genre, cle), liste in groupes.items():
-        for j, x in d.ouverts:
+        for j, x in tous:
             termes = [v for k in liste for v in couvre(k, j, x)]
             if not termes:
                 continue
@@ -144,12 +167,12 @@ def resoudre(d, propositions=3, limite=30.0, progression=None):
     par_cours = defaultdict(list)
     for k, s in enumerate(d.seances):
         par_cours[s.cours].append(k)
-    jours = sorted({j for j, _ in d.ouverts})
+    jours = sorted({j for j, _ in tous})
     for ks in par_cours.values():
         if len(ks) < 2:
             continue
         for j in jours:
-            termes = [v for (k, jj, i), v in y.items() if jj == j and k in ks]
+            termes = [v for k in ks for jj, _, v in par_seance[k] if jj == j]
             if len(termes) > 1:
                 exces = m.NewIntVar(0, len(termes), "")
                 m.Add(exces >= sum(termes) - 1)
@@ -262,7 +285,12 @@ def charger(annee):
             d.profs[c.enseignant_id] = c.enseignant.nom_complet
         for duree in c.seances():
             d.seances.append(Seance(cours=c.pk, classe=c.classe.nom, matiere=c.matiere.nom, prof=c.enseignant_id, duree=duree,
-                                    lourde=c.matiere.lourde, salle=c.matiere.salle_id))
+                                    lourde=c.est_lourde, salle=c.matiere.salle_id))
+    from scolarite.models import Classe
+
+    for classe in Classe.objects.filter(annee=annee, creneaux_edt__isnull=False):
+        d.ouverts_classe[classe.nom] = {tuple(x) for x in classe.creneaux_edt if 0 <= x[1] < len(d.heures)}
+
     def resume(liste):
         return ", ".join(liste[:6]) + (f" et {len(liste) - 6} autre(s)" if len(liste) > 6 else "")
 
