@@ -265,42 +265,102 @@ PROFS_LYCEE = [
 
 
 def remplir_lycee(ecole):
-    """Classes du lycée (séries S et L), leurs cours et des professeurs pour tester le générateur (idempotent)."""
-    from pedagogie.models import Cours, Disponibilite, Matiere, ProfilEnseignant, SalleSpecialisee
+    """
+    Classes du lycée (séries S et L), leurs cours et leurs professeurs. Idempotent élément par élément :
+    une classe, un cours ou un professeur déjà présents (créés à la main par exemple) sont gardés, on complète le reste.
+    """
+    from pedagogie.models import Cours, Matiere, ProfilEnseignant, SalleSpecialisee
 
     with schema_context(ecole.schema_name):
         annee = AnneeScolaire.objects.filter(active=True).first()
-        if not annee or Classe.objects.filter(annee=annee, nom="Seconde S").exists() or not Matiere.objects.exists():
+        if not annee or not Matiere.objects.exists():
             return False
+        ajouts = 0
         matieres = {nom: Matiere.objects.get_or_create(nom=nom)[0] for nom in (MATH, PC, SVT, FR, ANG, ESP, HG, EPS, PHILO)}
         labo = SalleSpecialisee.objects.filter(nom="Laboratoire").first()
-        if labo:  # le lycée partage le laboratoire : l'école en a deux
-            labo.nombre = max(labo.nombre, 2)
+        if labo and labo.nombre < 2:  # le lycée partage le laboratoire : l'école en a deux
+            labo.nombre = 2
             labo.save(update_fields=["nombre"])
         cours = {}
         for nom, (niveau, programme) in LYCEE.items():
-            classe = Classe.objects.create(annee=annee, nom=nom, niveau=niveau)
+            classe, cree = Classe.objects.get_or_create(annee=annee, nom=nom, defaults={"niveau": niveau})
+            ajouts += cree
             for matiere, (heures, seances, coef, dominante) in programme.items():
-                cours[nom, matiere] = Cours.objects.create(classe=classe, matiere=matieres[matiere], coefficient=coef,
-                                                           volume_horaire=heures, decoupage=seances, lourde=dominante)
+                c, cree = Cours.objects.get_or_create(classe=classe, matiere=matieres[matiere], defaults={
+                    "coefficient": coef, "volume_horaire": heures, "decoupage": seances, "lourde": dominante})
+                if not cree and not c.volume_horaire:
+                    c.volume_horaire, c.decoupage, c.lourde = heures, seances, dominante
+                    c.save(update_fields=["volume_horaire", "decoupage", "lourde"])
+                ajouts += cree
+                cours[nom, matiere] = c
         college = Classe.objects.filter(annee=annee, niveau__in=["6e", "5e", "4e", "3e"])
         for identifiant, prenom, nom, statut, matiere, classes in PROFS_LYCEE:
             email = f"{identifiant}@lycee-demo.sn"
-            u = Utilisateur.objects.filter(email=email).first() or Utilisateur.objects.create_user(
-                email, "Demo-Nexus-2026", prenom=prenom, nom=nom, role=Role.ENSEIGNANT)
+            u = Utilisateur.objects.filter(email=email).first()
+            if u is None:
+                u = Utilisateur.objects.create_user(email, "Demo-Nexus-2026", prenom=prenom, nom=nom, role=Role.ENSEIGNANT)
+                ajouts += 1
             profil, _ = ProfilEnseignant.objects.get_or_create(utilisateur=u, defaults={"statut": statut})
             profil.matieres.add(matieres[matiere])
             for c in classes:
                 if c == "college":
                     Cours.objects.filter(classe__in=college, matiere=matieres[matiere], enseignant__isnull=True).update(enseignant=u)
-                elif (c, matiere) in cours:
+                elif (c, matiere) in cours and cours[c, matiere].enseignant_id is None:
                     cours[c, matiere].enseignant = u
                     cours[c, matiere].save(update_fields=["enseignant"])
-        # La professeure d'espagnol est vacataire : elle enseigne dans un autre lycée le jeudi
-        fall = Utilisateur.objects.filter(email="ndeye.fall@lycee-demo.sn").first()
-        if fall and not Disponibilite.objects.filter(enseignant=fall).exists():
-            Disponibilite.objects.create(enseignant=fall, indispo=[[4, i] for i in range(7)], valide_le=timezone.now())
-        return True
+        return ajouts > 0
+
+
+# Disponibilités de démonstration, en heures (pour rester justes si l'école change sa grille).
+# (email, jours indisponibles, heures indisponibles {jour: "matin" | "apres_midi" | [heures]}, préférences, proposition à valider ?)
+MATIN, APRES_MIDI = "matin", "apres_midi"
+DISPONIBILITES = [
+    ("moussa.diallo", {3: "tout"}, {j: MATIN for j in (1, 2, 4, 5)}, False),          # enseigne à l'université le mercredi
+    ("ibrahima.sarr", {1: MATIN}, {}, False),
+    ("cheikh.ndao", {5: APRES_MIDI}, {2: MATIN, 4: MATIN}, False),
+    ("mariama.ba", {6: "tout"}, {}, False),
+    ("aminata.sow", {}, {j: MATIN for j in range(1, 7)}, False),                      # préfère les matins (labo)
+    ("adama.kane", {1: "tout", 2: "tout"}, {}, False),                                # stagiaire : formation lundi et mardi
+    ("ousmane.faye", {4: APRES_MIDI}, {}, False),
+    ("khady.diouf", {3: MATIN}, {}, True),                                            # proposition à valider
+    ("seydou.cisse", {6: "tout", 1: ["08:00"]}, {}, False),
+    ("abdoulaye.gueye", {5: MATIN}, {1: APRES_MIDI, 2: APRES_MIDI}, True),            # proposition à valider
+    ("ndeye.fall", {4: "tout"}, {}, False),                                           # vacataire : autre lycée le jeudi
+    ("pape.mbaye", {2: APRES_MIDI}, {}, False),
+    ("awa.ndour", {1: "tout", 2: "tout"}, {3: MATIN}, False),                         # vacataire
+    ("mamadou.thiam", {}, {j: ["08:00", "09:00"] for j in range(1, 7)}, False),       # EPS à la fraîche
+    ("prof.francais", {6: "tout"}, {}, False),
+]
+
+
+def remplir_disponibilites(ecole):
+    """Disponibilités variées pour tester le générateur ; un professeur qui en a déjà garde les siennes (idempotent)."""
+    from pedagogie.models import Disponibilite, GrilleHoraire
+
+    with schema_context(ecole.schema_name):
+        heures = GrilleHoraire.actuelle().heures
+
+        def cases(regles):
+            sortie = []
+            for jour, quoi in regles.items():
+                for i, h in enumerate(heures):
+                    if quoi == "tout" or (quoi == MATIN and h < "13:00") or (quoi == APRES_MIDI and h >= "13:00") \
+                            or (isinstance(quoi, list) and h in quoi):
+                        sortie.append([jour, i])
+            return sorted(sortie)
+
+        ajouts = 0
+        for identifiant, indispo, prefere, a_valider in DISPONIBILITES:
+            u = Utilisateur.objects.filter(email=f"{identifiant}@lycee-demo.sn").first()
+            if u is None or Disponibilite.objects.filter(enseignant=u).exists():
+                continue
+            ind, pre = cases(indispo), [c for c in cases(prefere) if c not in cases(indispo)]
+            if a_valider:
+                Disponibilite.objects.create(enseignant=u, indispo_propose=ind, prefere_propose=pre, propose_le=timezone.now())
+            else:
+                Disponibilite.objects.create(enseignant=u, indispo=ind, prefere=pre, valide_le=timezone.now())
+            ajouts += 1
+        return ajouts > 0
 
 
 def remplir_carte(ecole):

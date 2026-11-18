@@ -262,6 +262,13 @@ def faiblesses(d, choisis):
             h = sorted(x for x in heures if d.demi(x) == demi)
             if h and h[-1] - h[0] + 1 > len(h):
                 lignes.append(f"{d.profs[p]} : {h[-1] - h[0] + 1 - len(h)} h de trou le {JOURS[j].lower()}")
+    hors = defaultdict(int)
+    for k, j, i in choisis:
+        p = d.seances[k].prof
+        if p is not None and d.prefere.get(p) and any((j, x) not in d.prefere[p] for x in range(i, i + d.seances[k].duree)):
+            hors[p] += 1
+    for p, n in sorted(hors.items(), key=lambda e: -e[1]):
+        lignes.append(f"{d.profs[p]} : {n} séance(s) hors de ses créneaux préférés")
     return lignes
 
 

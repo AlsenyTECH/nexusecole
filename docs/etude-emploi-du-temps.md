@@ -106,7 +106,12 @@ combinaisons : un **solveur de contraintes** trouve de très bonnes solutions en
 - `POST /api/edt/generations/<id>/publier {proposition}` : remplace les créneaux de l'année par la proposition retenue.
 
 **Démo lycée** : Seconde S et L, Premières S1, S2 et L, Terminales S2 et L2, avec heures, coefficients et dominantes
-par série, et 14 professeurs (espagnol vacataire indisponible le jeudi). Le laboratoire passe à 2 salles.
+par série, et 14 professeurs. Le laboratoire passe à 2 salles. Création élément par élément : une classe ou un professeur
+déjà présents sont gardés, le reste est complété.
+
+**Disponibilités de démo** (en heures, donc justes même si la grille change) : 15 professeurs, dont mercredi à
+l'université (M. Diallo), stagiaire en formation lundi et mardi (M. Kane), vacataires (Mme Fall le jeudi, Mme Ndour),
+préférences (Mme Sow le matin, M. Thiam 8 h – 10 h pour l'EPS) et 2 propositions à valider (Mme Diouf, M. Guèye).
 Calcul complet (12 classes, 17 professeurs, 170 séances) : 3 propositions optimales en 2 s environ.
 
 **Démo** : volumes de toutes les matières, un laboratoire (SVT) et un terrain (EPS), professeure d'anglais vacataire

@@ -43,6 +43,8 @@ class Command(BaseCommand):
             self.stdout.write("  Générateur d'emplois du temps : volumes, laboratoire, terrain, disponibilités de démonstration.")
         if demo.remplir_lycee(ecole_demo):
             self.stdout.write("  Lycée : Seconde S et L, Premières S1, S2 et L, Terminales S2 et L2, et leurs professeurs.")
+        if demo.remplir_disponibilites(ecole_demo):
+            self.stdout.write("  Disponibilités de démonstration des professeurs (dont 2 propositions à valider).")
         self.stdout.write(self.style.SUCCESS(
             "\n  Console : http://admin.localhost:5173      (admin@nexusecole.sn)"
             "\n  École   : http://lycee-demo.localhost:5173 (directeur@lycee-demo.sn / Demo-Nexus-2026)"
